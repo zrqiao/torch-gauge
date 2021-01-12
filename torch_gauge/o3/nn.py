@@ -1,6 +1,6 @@
 import torch
 
-from torch_gauge.spherical import SphericalTensor
+from torch_gauge.o3.spherical import SphericalTensor
 
 
 class IEILinear(torch.nn.Module):
