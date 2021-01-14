@@ -1,0 +1,2 @@
+include versioneer.py
+include torch_gauge/_version.py
