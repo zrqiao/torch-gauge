@@ -163,6 +163,10 @@ class SphericalTensor:
         else:
             raise NotImplementedError
 
+    def invariant(self) -> torch.Tensor:
+        """Returns the invariant content"""
+        raise NotImplementedError
+
     def generate_rep_layout(self) -> torch.LongTensor:
         if len(self.rep_dims) == 1:
             return self._generate_rep_layout_1d(self.metadata[0]).unsqueeze(0).long()
