@@ -7,5 +7,8 @@ The evalulation scheme and ordering of representations follows:
 
 # Notes to myself
 # Using Pre-generate the required powers of array xyzpow: (N_{tuv}^{lm} x 3)
-# and the combination coefficients C^{lm}_{tuv}
+# and the combination coefficients C^{lm}_{tuv}, as well as a pointer tensor {l,m}
 # Then using torch.prod() and scatter_add to broadcast into solid harmonics
+
+import torch
+

@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
-from torch_gauge.o3.functional import NormContraction1d
+
+from torch import Tensor
+
+from torch_gauge.o3.functional import NormContraction1d, NormContraction2d
 
 import torch
 
@@ -30,10 +33,10 @@ class SphericalTensor:
     def __init__(
         self,
         data_ten: torch.Tensor,
-        rep_dims: Tuple[int],
+        rep_dims: Tuple[int, ...],
         metadata: torch.LongTensor,
         rep_layout: Optional[torch.LongTensor] = None,
-        num_channels: Optional[torch.LongTensor] = None,
+        num_channels: Optional[Tuple[int, ...]] = None,
     ):
         """
         Args:
@@ -51,15 +54,15 @@ class SphericalTensor:
         self.rep_dims = rep_dims
         self._norm_eps = 1e-4
         if rep_layout:
-            self._rep_layout = rep_layout
+            self.rep_layout = rep_layout
         else:
             if len(rep_dims) > 1:
                 assert rep_dims[1] - rep_dims[0] == 1
-            self._rep_layout = self.generate_rep_layout()
+            self.rep_layout = self.generate_rep_layout()
         if num_channels:
             self.num_channels = num_channels
         else:
-            self.num_channels = torch.sum(self.metadata, dim=1).long()
+            self.num_channels = tuple(torch.sum(self.metadata, dim=1).long().tolist())
 
     @property
     def shape(self):
@@ -79,7 +82,7 @@ class SphericalTensor:
             self.ten * other.ten,
             rep_dims=self.rep_dims,
             metadata=self.metadata,
-            rep_layout=self._rep_layout,
+            rep_layout=self.rep_layout,
             num_channels=self.num_channels,
         )
 
@@ -88,7 +91,7 @@ class SphericalTensor:
             self.ten + other.ten,
             rep_dims=self.rep_dims,
             metadata=self.metadata,
-            rep_layout=self._rep_layout,
+            rep_layout=self.rep_layout,
             num_channels=self.num_channels,
         )
 
@@ -102,7 +105,7 @@ class SphericalTensor:
             inplace (bool): If true, self.ten is updated in-place.
         """
         if len(self.rep_dims) == 1:
-            broadcasted_other = torch.index_select(other, dim=self.rep_dims[0], index=self._rep_layout[0, 2, :])
+            broadcasted_other = torch.index_select(other, dim=self.rep_dims[0], index=self.rep_layout[0, 2, :])
         elif len(self.rep_dims) == 2:
             broadcasted_other = torch.index_select(
                 other.view(
@@ -112,8 +115,8 @@ class SphericalTensor:
                 ),
                 dim=self.rep_dims[0],
                 index=(
-                    self._rep_layout[0, 2, :].unsqueeze(1) * self.num_channels[1]
-                    + self._rep_layout[1, 2, :].unsqueeze(0)
+                        self.rep_layout[0, 2, :].unsqueeze(1) * self.num_channels[1]
+                        + self.rep_layout[1, 2, :].unsqueeze(0)
                 ).view(-1),
             ).view_as(self.ten)
         else:
@@ -127,16 +130,13 @@ class SphericalTensor:
                 self.ten * broadcasted_other,
                 rep_dims=self.rep_dims,
                 metadata=self.metadata,
-                rep_layout=self._rep_layout,
+                rep_layout=self.rep_layout,
                 num_channels=self.num_channels,
             )
 
     def dot(self, other: "SphericalTensor", dim: int):
-        raise NotImplementedError
-
-    def rep_dot(self, other: "SphericalTensor", dim: int):
         """
-        Performing channel-wise inner multiplication.
+        Performing inner multiplication along a representation dimension.
         If self.n_rep_dim==1, a torch.Tensor is returned;
         if self.n_rep_dim==2, a SphericalTensor with n_rep_dim==1 is returned.
         Args:
@@ -147,13 +147,41 @@ class SphericalTensor:
         dotdim_idx = self.rep_dims.index(dim)
         assert other.rep_dims[0] == dim
         assert self.metadata[dotdim_idx] == other.metadata[0]
+        out_ten = self.ten.mul(other.ten).sum(dim)
+        if len(self.rep_dims) == 1:
+            return out_ten
+        elif len(self.rep_dims) == 2:
+            dimid_kept = 1 - dotdim_idx
+            return SphericalTensor(
+                out_ten,
+                rep_dims=(self.rep_dims[dimid_kept],),
+                metadata=self.metadata[dimid_kept].unsqueeze(0),
+                rep_layout=self.rep_layout[dimid_kept].unsqueeze(0),
+                num_channels=(self.num_channels[dimid_kept],),
+            )
+        else:
+            raise NotImplementedError
+
+    def rep_dot(self, other: "SphericalTensor", dim: int):
+        """
+        Performing channel-wise inner multiplication.
+        If self.n_rep_dim==1, a torch.Tensor is returned;
+        if self.n_rep_dim==2, a SphericalTensor with n_rep_dim==1 is returned.
+        Args:
+            other (SphericalTensor): must be a 1-d spherical tensor
+            with the same number of dimensions and broadcastable to self.ten.
+            dim (int): the dimension to perform the channel-wise inner product.
+        """
+        dotdim_idx = self.rep_dims.index(dim)
+        assert other.rep_dims[0] == dim
+        assert self.metadata[dotdim_idx] == other.metadata[0]
         singleton_shape = (-1 if d == dim else 1 for d in range(self.ten.dim()))
         mul_ten = self.ten * other.ten
         out_shape = mul_ten.shape
         out_shape[dim] = self.num_channels[dotdim_idx]
         out_ten = torch.zeros(out_shape, device=mul_ten.device, dtype=mul_ten.dtype).scatter_add_(
             dim=dim,
-            index=self._rep_layout[dotdim_idx, 2, :].view(*singleton_shape).expand_as(mul_ten),
+            index=self.rep_layout[dotdim_idx, 2, :].view(*singleton_shape).expand_as(mul_ten),
             src=mul_ten,
         )
         if len(self.rep_dims) == 1:
@@ -165,27 +193,55 @@ class SphericalTensor:
                 out_ten,
                 rep_dims=(self.rep_dims[dimid_kept],),
                 metadata=self.metadata[dimid_kept].unsqueeze(0),
-                rep_layout=self._rep_layout[dimid_kept].unsqueeze(0),
-                num_channels=self.num_channels[dimid_kept].unsqueeze(0),
+                rep_layout=self.rep_layout[dimid_kept].unsqueeze(0),
+                num_channels=(self.num_channels[dimid_kept],),
             )
         else:
             raise NotImplementedError
 
-    def fold(self, stride: int, update_self=False) -> "SphericalTensor":
-        """Fold the chucked representation channels to a new dimension"""
+    def outer(self, other: "SphericalTensor") -> "SphericalTensor":
+        """
+        Returns the batched outer product of two 1-d spherical tensors
+        The rep_dim of self and other much be contiguous
+        """
         assert len(self.rep_dims) == 1
-        assert torch.all(torch.fmod(self.metadata, stride) == 0)
+        assert len(other.rep_dims) == 1
+        if self.rep_dims[0] + 1 == other.rep_dims[0]:
+            odim = self.rep_dims[0]
+            a, b = self, other
+        elif self.rep_dims[0] - 1 == other.rep_dims[0]:
+            odim = other.rep_dims[0]
+            a, b = other, self
+        else:
+            raise AssertionError("The representation dimensions of self and other must be contiguous")
+        out_ten = a.ten.unsqueeze(odim+1).mul(b.ten.unsqueeze(odim))
+        out_metadata = torch.cat([a.metadata, b.metadata], dim=0)
+        out_rep_layout = torch.cat([a.rep_layout, b.rep_layout], dim=0)
+        return SphericalTensor(
+            out_ten,
+            rep_dims=(odim, odim+1),
+            metadata=out_metadata,
+            rep_layout=out_rep_layout,
+            num_channels=(a.num_channels, b.num_channels),
+        )
+
+    def fold(self, stride: int, update_self=False) -> "SphericalTensor":
+        """
+        Fold the chucked representation channels of a 1-d SphericalTensor to a new dimension
+        """
+        assert len(self.rep_dims) == 1
+        assert torch.fmod(self.metadata, stride) == 0
         new_ten = self.ten.unflatten(
             dim=self.rep_dims[0],
             sizes=(self.shape[self.rep_dims[0]]//stride, stride),
         )
         new_metadata = self.metadata//stride
-        new_rep_layout = self._rep_layout[:, :, ::stride]
-        new_num_channels = self.num_channels//stride
+        new_rep_layout = self.rep_layout[:, :, ::stride]
+        new_num_channels = (self.num_channels[0]//stride,)
         if update_self:
             self.ten = new_ten
             self.metadata = new_metadata
-            self._rep_layout = new_rep_layout
+            self.rep_layout = new_rep_layout
             self.num_channels = new_num_channels
             return self
         else:
@@ -196,10 +252,6 @@ class SphericalTensor:
                 rep_layout=new_rep_layout,
                 num_channels=new_num_channels,
             )
-
-    def outer(self, other: "SphericalTensor") -> "SphericalTensor":
-        """Returns the channel-wise outer product"""
-        raise NotImplementedError
 
     def invariant(self) -> torch.Tensor:
         """
@@ -219,10 +271,19 @@ class SphericalTensor:
                 start=self.metadata[0, 0],
                 length=self.ten.shape[ops_dim] - self.metadata[0, 0],
             )
-            idx_ten = self._rep_layout[0, 2, self.metadata[0, 0]:].view(singleton_shape).expand_as(data_rep.shape)
+            idx_ten = self.rep_layout[0, 2, self.metadata[0, 0]:].view(singleton_shape).expand_as(data_rep)
             invariant_rep = NormContraction1d.apply(data_rep, idx_ten, norm_shape, ops_dim, self._norm_eps)
             return torch.cat([data_l0, invariant_rep], dim=ops_dim)
         elif len(self.rep_dims) == 2:
+            singleton_shape = (-1 if d in self.rep_dims else 1 for d in range(self.ten.dim()))
+            idx_ten_0 = self.rep_layout[0, 2, :].unsqueeze(1).view(singleton_shape).expand_as(self.ten)
+            idx_ten_1 = self.rep_layout[1, 2, :].unsqueeze(0).view(singleton_shape).expand_as(self.ten)
+            idx_tens = torch.stack([idx_ten_0, idx_ten_1], dim=0)
+            norm_shape = self.shape
+            norm_shape[self.rep_dims] = self.num_channels
+            invariant2d = NormContraction2d.apply(self.ten, idx_tens, norm_shape, self.rep_dims, self._norm_eps)
+            return invariant2d
+        else:
             raise NotImplementedError
 
     def generate_rep_layout(self) -> torch.LongTensor:
@@ -260,5 +321,5 @@ class SphericalTensor:
         # Do not transfer metadata to GPU, as index tracking should be more efficient
         # on CPUs
         self.ten = self.ten.to(device)
-        self._rep_layout = self._rep_layout.to(device)
+        self.rep_layout = self.rep_layout.to(device)
         return self
