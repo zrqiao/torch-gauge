@@ -40,7 +40,7 @@ class SphericalTensor:
             data_ten: the underlying flattened data tensor in the
              strictly incremental [l,m,n] order, for which the rep_dim has N elements
             rep_dims: the spherical tensor representation dimension(s). When
-            n_rep_dims > 1, must be consecutive dimensions.
+             n_rep_dims > 1, must be contiguous dimensions.
             metadata: (n_rep_dims x n_l) specification of the number of unique
              channels (n) for each angular momentum index l.
             rep_layout (optional): the (3xN) index tensor for (l[i],m[i],n[i]).
@@ -134,7 +134,7 @@ class SphericalTensor:
     def dot(self, other: "SphericalTensor", dim: int):
         raise NotImplementedError
 
-    def repdot(self, other: "SphericalTensor", dim: int):
+    def rep_dot(self, other: "SphericalTensor", dim: int):
         """
         Performing channel-wise inner multiplication.
         If self.n_rep_dim==1, a torch.Tensor is returned;
