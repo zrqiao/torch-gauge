@@ -60,7 +60,6 @@ class SphericalTensor:
             self.num_channels = num_channels
         else:
             self.num_channels = torch.sum(self.metadata, dim=1).long()
-        # TODO: reshaping utilities
 
     @property
     def shape(self):
@@ -172,11 +171,33 @@ class SphericalTensor:
         else:
             raise NotImplementedError
 
-    def fold(self, stride) -> "SphericalTensor":
-        """Fold the representation channels to a new dimension"""
-        raise NotImplementedError
+    def fold(self, stride: int, update_self=False) -> "SphericalTensor":
+        """Fold the chucked representation channels to a new dimension"""
+        assert len(self.rep_dims) == 1
+        assert torch.all(torch.fmod(self.metadata, stride) == 0)
+        new_ten = self.ten.unflatten(
+            dim=self.rep_dims[0],
+            sizes=(self.shape[self.rep_dims[0]]//stride, stride),
+        )
+        new_metadata = self.metadata//stride
+        new_rep_layout = self._rep_layout[:, :, ::stride]
+        new_num_channels = self.num_channels//stride
+        if update_self:
+            self.ten = new_ten
+            self.metadata = new_metadata
+            self._rep_layout = new_rep_layout
+            self.num_channels = new_num_channels
+            return self
+        else:
+            return SphericalTensor(
+                new_ten,
+                rep_dims=self.rep_dims,
+                metadata=new_metadata,
+                rep_layout=new_rep_layout,
+                num_channels=new_num_channels,
+            )
 
-    def outer(self, other) -> "SphericalTensor":
+    def outer(self, other: "SphericalTensor") -> "SphericalTensor":
         """Returns the channel-wise outer product"""
         raise NotImplementedError
 
