@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
+from torch_gauge.o3.functional import NormContraction1d
 
 import torch
 
@@ -48,6 +49,7 @@ class SphericalTensor:
         self.ten = data_ten
         self.metadata = metadata
         self.rep_dims = rep_dims
+        self._norm_eps = 1e-4
         if rep_layout:
             self._rep_layout = rep_layout
         else:
@@ -59,6 +61,10 @@ class SphericalTensor:
         else:
             self.num_channels = torch.sum(self.metadata, dim=1).long()
         # TODO: reshaping utilities
+
+    @property
+    def shape(self):
+        return self.ten.shape
 
     def mul_(self, other: "SphericalTensor"):
         # Be careful that this operation will break equivariance
@@ -127,8 +133,11 @@ class SphericalTensor:
             )
 
     def dot(self, other: "SphericalTensor", dim: int):
+        raise NotImplementedError
+
+    def repdot(self, other: "SphericalTensor", dim: int):
         """
-        Performing representation-wise inner multiplication.
+        Performing channel-wise inner multiplication.
         If self.n_rep_dim==1, a torch.Tensor is returned;
         if self.n_rep_dim==2, a SphericalTensor with n_rep_dim==1 is returned.
         Args:
@@ -139,7 +148,7 @@ class SphericalTensor:
         dotdim_idx = self.rep_dims.index(dim)
         assert other.rep_dims[0] == dim
         assert self.metadata[dotdim_idx] == other.metadata[0]
-        singleton_shape = (-1 if d == dotdim_idx else 1 for d in range(self.ten.dim()))
+        singleton_shape = (-1 if d == dim else 1 for d in range(self.ten.dim()))
         mul_ten = self.ten * other.ten
         out_shape = mul_ten.shape
         out_shape[dim] = self.num_channels[dotdim_idx]
@@ -163,9 +172,37 @@ class SphericalTensor:
         else:
             raise NotImplementedError
 
-    def invariant(self) -> torch.Tensor:
-        """Returns the invariant content"""
+    def fold(self, stride) -> "SphericalTensor":
+        """Fold the representation channels to a new dimension"""
         raise NotImplementedError
+
+    def outer(self, other) -> "SphericalTensor":
+        """Returns the channel-wise outer product"""
+        raise NotImplementedError
+
+    def invariant(self) -> torch.Tensor:
+        """
+        Returns the invariant content
+        When self.n_rep_dim==1, the l=0 channels are retained;
+        When self.n_rep_dim==2, the (l1=0, l2=0) channels are also contracted.
+        """
+        if len(self.rep_dims) == 1:
+            ops_dim = self.rep_dims[0]
+            data_l0 = torch.narrow(self.ten, dim=ops_dim, start=0, length=self.metadata[0, 0])
+            norm_shape = self.shape
+            norm_shape[ops_dim] = self.num_channels[0]
+            singleton_shape = (-1 if d == ops_dim else 1 for d in range(self.ten.dim()))
+            data_rep = torch.narrow(
+                self.ten,
+                dim=ops_dim,
+                start=self.metadata[0, 0],
+                length=self.ten.shape[ops_dim] - self.metadata[0, 0],
+            )
+            idx_ten = self._rep_layout[0, 2, self.metadata[0, 0]:].view(singleton_shape).expand_as(data_rep.shape)
+            invariant_rep = NormContraction1d.apply(data_rep, idx_ten, norm_shape, ops_dim, self._norm_eps)
+            return torch.cat([data_l0, invariant_rep], dim=ops_dim)
+        elif len(self.rep_dims) == 2:
+            raise NotImplementedError
 
     def generate_rep_layout(self) -> torch.LongTensor:
         if len(self.rep_dims) == 1:
