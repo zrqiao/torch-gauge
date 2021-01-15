@@ -40,18 +40,23 @@ class IEILinear(torch.nn.Module):
         self._metadata_out = metadata_out
         # The bias must be False
         self.linears = torch.nn.ModuleList(
-            [torch.nn.Linear(metadata_in[l], metadata_out[l], bias=False) for l, _ in enumerate(metadata_in)]
+            [
+                torch.nn.Linear(metadata_in[l], metadata_out[l], bias=False)
+                for l, _ in enumerate(metadata_in)
+            ]
         )
         n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0)) * 2 + 1
         self._end_inds_in = torch.cumsum(self._metadata_in * n_irreps_per_l, dim=0)
-        self._start_inds_in = (torch.cat([torch.LongTensor([0]), self._end_inds_in[:-1]]),)
+        self._start_inds_in = (
+            torch.cat([torch.LongTensor([0]), self._end_inds_in[:-1]]),
+        )
 
     def forward(self, x: SphericalTensor) -> torch.Tensor:
         assert x.metadata == self._metadata_in
         # TODO: vectorization
         outs = []
         for l, linear_l in enumerate(self._metadata_in):
-            in_l = x.ten[..., self._start_inds_in[l]: self._end_inds_in[l]]
+            in_l = x.ten[..., self._start_inds_in[l] : self._end_inds_in[l]]
             out_l = linear_l(in_l.view(2 * l + 1, -1)).view(-1)
             outs.append(out_l)
 
@@ -84,6 +89,6 @@ class RepNorm(torch.nn.Module):
     def forward(self, x: SphericalTensor) -> (torch.Tensor, SphericalTensor):
         x0 = x.invariant()
         x1 = self.batchnorm(x0)
-        divisor = torch.abs(x0.mul(1-self.beta) + self.beta) + self._eps
-        x2 = x.scalar_mul(1/divisor)
+        divisor = torch.abs(x0.mul(1 - self.beta) + self.beta) + self._eps
+        x2 = x.scalar_mul(1 / divisor)
         return x1, x2

@@ -1,5 +1,5 @@
-from typing import List
 from dataclasses import dataclass
+from typing import List
 
 import torch
 
@@ -33,7 +33,11 @@ class VerletList:
         self.batch_num_nodes = torch.LongTensor([self.n_nodes])
 
         in_degrees = verlet_mask.long().sum(1)
-        src_raw = torch.arange(num_nodes, dtype=torch.long).unsqueeze(0).expand(num_nodes, num_nodes)[verlet_mask]
+        src_raw = (
+            torch.arange(num_nodes, dtype=torch.long)
+            .unsqueeze(0)
+            .expand(num_nodes, num_nodes)[verlet_mask]
+        )
 
         # Scatter the src node-ids to the (N*PADDING_SIZE) padded table
         src_locators_1d = torch.LongTensor(
@@ -44,7 +48,11 @@ class VerletList:
             ]
         )
         src_edim_locators_flattened = torch.LongTensor(
-            [src_location for dstid in range(self.n_nodes) for src_location in range(in_degrees[dstid])]
+            [
+                src_location
+                for dstid in range(self.n_nodes)
+                for src_location in range(in_degrees[dstid])
+            ]
         )
         src_edim_locators = torch.zeros(num_nodes, num_nodes, dtype=torch.long)
         src_edim_locators[verlet_mask] = src_edim_locators_flattened
@@ -116,7 +124,11 @@ class VerletList:
             ]
         )
         src_edim_locators = torch.LongTensor(
-            [src_location for dstid in range(self.n_nodes) for src_location in range(in_degrees[dstid])]
+            [
+                src_location
+                for dstid in range(self.n_nodes)
+                for src_location in range(in_degrees[dstid])
+            ]
         )
         g.edata["dst_edim_locators"] = torch.zeros_like(src_edim_locators)
         g.edata["dst_edim_locators"][g.edge_ids(src_raw, dst_raw)] = src_edim_locators
@@ -161,7 +173,9 @@ class VerletList:
             )
             .scatter_(
                 dim=0,
-                index=src_locators_1d.unsqueeze(1).expand(-1, g.edata[k][0, ...].numel()),
+                index=src_locators_1d.unsqueeze(1).expand(
+                    -1, g.edata[k][0, ...].numel()
+                ),
                 src=g.edata[k][eid_raw, ...].view(g.edata[k].shape[0], -1),
             )
             .view(self.n_nodes, self.PADSIZE, *g.edata[k].shape[1:])
@@ -191,9 +205,13 @@ class VerletList:
         """
         Flipping src / dst node indexing order without inverting the data
         """
-        scatter_ten = (self.neighbor_idx * self.PADSIZE + self._dst_edim_locators)[self.edge_mask]
+        scatter_ten = (self.neighbor_idx * self.PADSIZE + self._dst_edim_locators)[
+            self.edge_mask
+        ]
         out_ten = torch.zeros_like(data).view(self.n_nodes * self.PADSIZE, -1)
-        out_ten[scatter_ten, :] = data.view(self.n_nodes, self.PADSIZE, -1)[self.edge_mask, :]
+        out_ten[scatter_ten, :] = data.view(self.n_nodes, self.PADSIZE, -1)[
+            self.edge_mask, :
+        ]
         return out_ten.view_as(data)
 
     def to(self, device):
@@ -211,13 +229,25 @@ class VerletList:
         batched_vl.batch_num_nodes = torch.cat([vl.batch_num_nodes for vl in vls])
         batched_vl.n_nodes = torch.sum(batched_vl.batch_num_nodes)
         bnn_offsets = torch.repeat_interleave(
-            torch.cat([torch.LongTensor([0]), torch.cumsum(batched_vl.batch_num_nodes, dim=0)])[:-1],
+            torch.cat(
+                [torch.LongTensor([0]), torch.cumsum(batched_vl.batch_num_nodes, dim=0)]
+            )[:-1],
             batched_vl.batch_num_nodes,
         )
-        batched_vl.neighbor_idx = torch.cat([vl.neighbor_idx for vl in vls], dim=0) + bnn_offsets.unsqueeze(1)
+        batched_vl.neighbor_idx = torch.cat(
+            [vl.neighbor_idx for vl in vls], dim=0
+        ) + bnn_offsets.unsqueeze(1)
         batched_vl.edge_mask = torch.cat([vl.edge_mask for vl in vls], dim=0)
-        batched_vl.ndata = {nk: torch.cat([vl.ndata[nk] for vl in vls], dim=0) for nk in vls[0].ndata.keys()}
-        batched_vl.edata = {ek: torch.cat([vl.edata[ek] for vl in vls], dim=0) for ek in vls[0].edata.keys()}
-        batched_vl._dst_edim_locators = torch.cat([vl._dst_edim_locators for vl in vls], dim=0)
+        batched_vl.ndata = {
+            nk: torch.cat([vl.ndata[nk] for vl in vls], dim=0)
+            for nk in vls[0].ndata.keys()
+        }
+        batched_vl.edata = {
+            ek: torch.cat([vl.edata[ek] for vl in vls], dim=0)
+            for ek in vls[0].edata.keys()
+        }
+        batched_vl._dst_edim_locators = torch.cat(
+            [vl._dst_edim_locators for vl in vls], dim=0
+        )
 
         return batched_vl

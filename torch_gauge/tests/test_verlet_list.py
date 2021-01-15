@@ -1,4 +1,5 @@
 import torch
+
 from torch_gauge.verlet_list import VerletList
 
 
@@ -16,7 +17,9 @@ def test_verletlist_inversion_sparse():
     mask_pre = torch.rand(17, 17)
     mask = (mask_pre + mask_pre.t()) > 0.5
     vl_test = VerletList().from_mask(mask, 32, 17, {}, {"test_edata": data})
-    assert torch.all(data[mask, ...].eq(vl_test.edata["test_edata"][vl_test.edge_mask, ...]))
+    assert torch.all(
+        data[mask, ...].eq(vl_test.edata["test_edata"][vl_test.edge_mask, ...])
+    )
 
     inversed = vl_test.to_src_first_view(vl_test.edata["test_edata"])
     sparse1 = torch.zeros_like(data)

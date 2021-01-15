@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import torch
 
 
@@ -11,10 +9,12 @@ class NormContraction1d(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(ctx, data_ten: torch.Tensor, idx_ten: torch.LongTensor, out_shape, dim, eps):
-        sum_sqr = torch.zeros(out_shape, device=data_ten.device, dtype=data_ten.dtype).scatter_add_(
-            dim=dim, index=idx_ten, src=data_ten.pow(2)
-        )
+    def forward(
+        ctx, data_ten: torch.Tensor, idx_ten: torch.LongTensor, out_shape, dim, eps
+    ):
+        sum_sqr = torch.zeros(
+            out_shape, device=data_ten.device, dtype=data_ten.dtype
+        ).scatter_add_(dim=dim, index=idx_ten, src=data_ten.pow(2))
         norm_shifted = (sum_sqr + eps.mul(eps)).sqrt()
         ctx.dim = dim
         ctx.save_for_backward(data_ten, idx_ten, norm_shifted)
@@ -47,16 +47,22 @@ class NormContraction2d(torch.autograd.Function):
     ):
         # TODO: double-check the column-first behavior
         shape_rep_out = out_shape[dims]
-        cache_inds = idx_tens[0] * shape_rep_out[1] + idx_tens[1]  # flattened dst indices
+        cache_inds = (
+            idx_tens[0] * shape_rep_out[1] + idx_tens[1]
+        )  # flattened dst indices
         cache_inds = cache_inds.flatten(*dims)
         sum_sqr = torch.zeros(
             out_shape,
             device=data_ten.device,
             dtype=data_ten.dtype,
         ).flatten(*dims)
-        sum_sqr = sum_sqr.scatter_add_(dim=dims[0], index=cache_inds, src=data_ten.pow(2))
+        sum_sqr = sum_sqr.scatter_add_(
+            dim=dims[0], index=cache_inds, src=data_ten.pow(2)
+        )
         norm_cache_shifted = (sum_sqr + eps.mul(eps)).sqrt()
-        norm_shifted = norm_cache_shifted.view(out_shape)  # must be contiguous at this point
+        norm_shifted = norm_cache_shifted.view(
+            out_shape
+        )  # must be contiguous at this point
         ctx.dims = dims
         ctx.save_for_backward(data_ten, cache_inds, norm_cache_shifted)
         return norm_shifted - eps

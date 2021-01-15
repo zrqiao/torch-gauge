@@ -1,18 +1,16 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from torch import Tensor
+import torch
 
 from torch_gauge.o3.functional import NormContraction1d, NormContraction2d
-
-import torch
 
 
 @dataclass
 class SphericalTensor:
     r"""
     The SphericalTensor class tracks the SO(3) representation indices
-     for a flattened data tensor for efficient group algebra operations.
+     of a flattened data tensor for efficient group algebra operations.
 
     All angular and magnetic quantum number indices are treated as equivalent,
      and all non-degenerate feature channels are regarded as the "principal"
@@ -105,7 +103,9 @@ class SphericalTensor:
             inplace (bool): If true, self.ten is updated in-place.
         """
         if len(self.rep_dims) == 1:
-            broadcasted_other = torch.index_select(other, dim=self.rep_dims[0], index=self.rep_layout[0, 2, :])
+            broadcasted_other = torch.index_select(
+                other, dim=self.rep_dims[0], index=self.rep_layout[0, 2, :]
+            )
         elif len(self.rep_dims) == 2:
             broadcasted_other = torch.index_select(
                 other.view(
@@ -115,8 +115,8 @@ class SphericalTensor:
                 ),
                 dim=self.rep_dims[0],
                 index=(
-                        self.rep_layout[0, 2, :].unsqueeze(1) * self.num_channels[1]
-                        + self.rep_layout[1, 2, :].unsqueeze(0)
+                    self.rep_layout[0, 2, :].unsqueeze(1) * self.num_channels[1]
+                    + self.rep_layout[1, 2, :].unsqueeze(0)
                 ).view(-1),
             ).view_as(self.ten)
         else:
@@ -136,7 +136,7 @@ class SphericalTensor:
 
     def dot(self, other: "SphericalTensor", dim: int):
         """
-        Performing inner multiplication along a representation dimension.
+        Performing inner product along a representation dimension.
         If self.n_rep_dim==1, a torch.Tensor is returned;
         if self.n_rep_dim==2, a SphericalTensor with n_rep_dim==1 is returned.
         Args:
@@ -164,7 +164,7 @@ class SphericalTensor:
 
     def rep_dot(self, other: "SphericalTensor", dim: int):
         """
-        Performing channel-wise inner multiplication.
+        Performing channel-wise inner products.
         If self.n_rep_dim==1, a torch.Tensor is returned;
         if self.n_rep_dim==2, a SphericalTensor with n_rep_dim==1 is returned.
         Args:
@@ -179,9 +179,13 @@ class SphericalTensor:
         mul_ten = self.ten * other.ten
         out_shape = mul_ten.shape
         out_shape[dim] = self.num_channels[dotdim_idx]
-        out_ten = torch.zeros(out_shape, device=mul_ten.device, dtype=mul_ten.dtype).scatter_add_(
+        out_ten = torch.zeros(
+            out_shape, device=mul_ten.device, dtype=mul_ten.dtype
+        ).scatter_add_(
             dim=dim,
-            index=self.rep_layout[dotdim_idx, 2, :].view(*singleton_shape).expand_as(mul_ten),
+            index=self.rep_layout[dotdim_idx, 2, :]
+            .view(*singleton_shape)
+            .expand_as(mul_ten),
             src=mul_ten,
         )
         if len(self.rep_dims) == 1:
@@ -213,13 +217,15 @@ class SphericalTensor:
             odim = other.rep_dims[0]
             a, b = other, self
         else:
-            raise AssertionError("The representation dimensions of self and other must be contiguous")
-        out_ten = a.ten.unsqueeze(odim+1).mul(b.ten.unsqueeze(odim))
+            raise AssertionError(
+                "The representation dimensions of self and other must be contiguous"
+            )
+        out_ten = a.ten.unsqueeze(odim + 1).mul(b.ten.unsqueeze(odim))
         out_metadata = torch.cat([a.metadata, b.metadata], dim=0)
         out_rep_layout = torch.cat([a.rep_layout, b.rep_layout], dim=0)
         return SphericalTensor(
             out_ten,
-            rep_dims=(odim, odim+1),
+            rep_dims=(odim, odim + 1),
             metadata=out_metadata,
             rep_layout=out_rep_layout,
             num_channels=(a.num_channels, b.num_channels),
@@ -233,11 +239,11 @@ class SphericalTensor:
         assert torch.fmod(self.metadata, stride) == 0
         new_ten = self.ten.unflatten(
             dim=self.rep_dims[0],
-            sizes=(self.shape[self.rep_dims[0]]//stride, stride),
+            sizes=(self.shape[self.rep_dims[0]] // stride, stride),
         )
-        new_metadata = self.metadata//stride
+        new_metadata = self.metadata // stride
         new_rep_layout = self.rep_layout[:, :, ::stride]
-        new_num_channels = (self.num_channels[0]//stride,)
+        new_num_channels = (self.num_channels[0] // stride,)
         if update_self:
             self.ten = new_ten
             self.metadata = new_metadata
@@ -261,7 +267,9 @@ class SphericalTensor:
         """
         if len(self.rep_dims) == 1:
             ops_dim = self.rep_dims[0]
-            data_l0 = torch.narrow(self.ten, dim=ops_dim, start=0, length=self.metadata[0, 0])
+            data_l0 = torch.narrow(
+                self.ten, dim=ops_dim, start=0, length=self.metadata[0, 0]
+            )
             norm_shape = self.shape
             norm_shape[ops_dim] = self.num_channels[0]
             singleton_shape = (-1 if d == ops_dim else 1 for d in range(self.ten.dim()))
@@ -271,17 +279,37 @@ class SphericalTensor:
                 start=self.metadata[0, 0],
                 length=self.ten.shape[ops_dim] - self.metadata[0, 0],
             )
-            idx_ten = self.rep_layout[0, 2, self.metadata[0, 0]:].view(singleton_shape).expand_as(data_rep)
-            invariant_rep = NormContraction1d.apply(data_rep, idx_ten, norm_shape, ops_dim, self._norm_eps)
+            idx_ten = (
+                self.rep_layout[0, 2, self.metadata[0, 0] :]
+                .view(singleton_shape)
+                .expand_as(data_rep)
+            )
+            invariant_rep = NormContraction1d.apply(
+                data_rep, idx_ten, norm_shape, ops_dim, self._norm_eps
+            )
             return torch.cat([data_l0, invariant_rep], dim=ops_dim)
         elif len(self.rep_dims) == 2:
-            singleton_shape = (-1 if d in self.rep_dims else 1 for d in range(self.ten.dim()))
-            idx_ten_0 = self.rep_layout[0, 2, :].unsqueeze(1).view(singleton_shape).expand_as(self.ten)
-            idx_ten_1 = self.rep_layout[1, 2, :].unsqueeze(0).view(singleton_shape).expand_as(self.ten)
+            singleton_shape = (
+                -1 if d in self.rep_dims else 1 for d in range(self.ten.dim())
+            )
+            idx_ten_0 = (
+                self.rep_layout[0, 2, :]
+                .unsqueeze(1)
+                .view(singleton_shape)
+                .expand_as(self.ten)
+            )
+            idx_ten_1 = (
+                self.rep_layout[1, 2, :]
+                .unsqueeze(0)
+                .view(singleton_shape)
+                .expand_as(self.ten)
+            )
             idx_tens = torch.stack([idx_ten_0, idx_ten_1], dim=0)
             norm_shape = self.shape
             norm_shape[self.rep_dims] = self.num_channels
-            invariant2d = NormContraction2d.apply(self.ten, idx_tens, norm_shape, self.rep_dims, self._norm_eps)
+            invariant2d = NormContraction2d.apply(
+                self.ten, idx_tens, norm_shape, self.rep_dims, self._norm_eps
+            )
             return invariant2d
         else:
             raise NotImplementedError
@@ -301,7 +329,9 @@ class SphericalTensor:
         n_irreps_per_l = torch.arange(start=0, end=metadata1d.size(0)) * 2 + 1
         end_channelids = torch.cumsum(metadata1d, dim=0)
         start_channelids = (torch.cat([torch.LongTensor([0]), end_channelids[:-1]]),)
-        dst_ls = torch.repeat_interleave(torch.arange(n_irreps_per_l.size(0)), n_irreps_per_l * metadata1d)
+        dst_ls = torch.repeat_interleave(
+            torch.arange(n_irreps_per_l.size(0)), n_irreps_per_l * metadata1d
+        )
         dst_ms = torch.repeat_interleave(
             torch.cat([torch.arange(0, n_irreps) for n_irreps in n_irreps_per_l]),
             torch.repeat_interleave(metadata1d, n_irreps_per_l),
