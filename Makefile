@@ -33,7 +33,7 @@ mypy:
 
 .PHONY: test
 test:
-	pytest -v --cov=torch_gauge/
+	pytest -v torch_gauge
 
 .PHONY: docs
 docs:
