@@ -1,2 +1,10 @@
+include LICENSE
 include versioneer.py
+include setup.cfg
+include MANIFEST.in
+
+exclude README.md
+
+graft torch_gauge
+global-exclude *.py[cod] __pycache__ tests
 include torch_gauge/_version.py

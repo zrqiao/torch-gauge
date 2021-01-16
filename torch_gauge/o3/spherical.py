@@ -23,7 +23,7 @@ class SphericalTensor:
         metadata (torch.LongTensor): the minimal information which specifies
             the number of non-degenerate feature channels for each dimension
             and each l (and the associated m(s)).
-        rep_layout (torch.LongTensor): stores the pointer (l[i], m[i], n[i])
+        rep_layout (Tuple[torch.LongTensor]): stores the pointer (l[i], m[i], n[i])
             for each index i along the SO(3) representation dimension of the
             flattened data tensor.
     """
@@ -33,7 +33,7 @@ class SphericalTensor:
         data_ten: torch.Tensor,
         rep_dims: Tuple[int, ...],
         metadata: torch.LongTensor,
-        rep_layout: Optional[torch.LongTensor] = None,
+        rep_layout: Optional[Tuple[torch.LongTensor, ...]] = None,
         num_channels: Optional[Tuple[int, ...]] = None,
     ):
         """
@@ -104,7 +104,7 @@ class SphericalTensor:
         """
         if len(self.rep_dims) == 1:
             broadcasted_other = torch.index_select(
-                other, dim=self.rep_dims[0], index=self.rep_layout[0, 2, :]
+                other, dim=self.rep_dims[0], index=self.rep_layout[0][2, :]
             )
         elif len(self.rep_dims) == 2:
             broadcasted_other = torch.index_select(
@@ -115,8 +115,8 @@ class SphericalTensor:
                 ),
                 dim=self.rep_dims[0],
                 index=(
-                    self.rep_layout[0, 2, :].unsqueeze(1) * self.num_channels[1]
-                    + self.rep_layout[1, 2, :].unsqueeze(0)
+                    self.rep_layout[0][2, :].unsqueeze(1) * self.num_channels[1]
+                    + self.rep_layout[1][2, :].unsqueeze(0)
                 ).view(-1),
             ).view_as(self.ten)
         else:
@@ -156,7 +156,7 @@ class SphericalTensor:
                 out_ten,
                 rep_dims=(self.rep_dims[dimid_kept],),
                 metadata=self.metadata[dimid_kept].unsqueeze(0),
-                rep_layout=self.rep_layout[dimid_kept].unsqueeze(0),
+                rep_layout=(self.rep_layout[dimid_kept],),
                 num_channels=(self.num_channels[dimid_kept],),
             )
         else:
@@ -197,7 +197,7 @@ class SphericalTensor:
                 out_ten,
                 rep_dims=(self.rep_dims[dimid_kept],),
                 metadata=self.metadata[dimid_kept].unsqueeze(0),
-                rep_layout=self.rep_layout[dimid_kept].unsqueeze(0),
+                rep_layout=(self.rep_layout[dimid_kept],),
                 num_channels=(self.num_channels[dimid_kept],),
             )
         else:
@@ -222,7 +222,7 @@ class SphericalTensor:
             )
         out_ten = a.ten.unsqueeze(odim + 1).mul(b.ten.unsqueeze(odim))
         out_metadata = torch.cat([a.metadata, b.metadata], dim=0)
-        out_rep_layout = torch.cat([a.rep_layout, b.rep_layout], dim=0)
+        out_rep_layout = (a.rep_layout, b.rep_layout)
         return SphericalTensor(
             out_ten,
             rep_dims=(odim, odim + 1),
@@ -242,7 +242,7 @@ class SphericalTensor:
             sizes=(self.shape[self.rep_dims[0]] // stride, stride),
         )
         new_metadata = self.metadata // stride
-        new_rep_layout = self.rep_layout[:, :, ::stride]
+        new_rep_layout = (self.rep_layout[0][:, ::stride],)
         new_num_channels = (self.num_channels[0] // stride,)
         if update_self:
             self.ten = new_ten
@@ -280,7 +280,7 @@ class SphericalTensor:
                 length=self.ten.shape[ops_dim] - self.metadata[0, 0],
             )
             idx_ten = (
-                self.rep_layout[0, 2, self.metadata[0, 0] :]
+                self.rep_layout[0][2, self.metadata[0, 0] :]
                 .view(singleton_shape)
                 .expand_as(data_rep)
             )
@@ -293,13 +293,13 @@ class SphericalTensor:
                 -1 if d in self.rep_dims else 1 for d in range(self.ten.dim())
             )
             idx_ten_0 = (
-                self.rep_layout[0, 2, :]
+                self.rep_layout[0][2, :]
                 .unsqueeze(1)
                 .view(singleton_shape)
                 .expand_as(self.ten)
             )
             idx_ten_1 = (
-                self.rep_layout[1, 2, :]
+                self.rep_layout[1][2, :]
                 .unsqueeze(0)
                 .view(singleton_shape)
                 .expand_as(self.ten)
@@ -314,21 +314,21 @@ class SphericalTensor:
         else:
             raise NotImplementedError
 
-    def generate_rep_layout(self) -> torch.LongTensor:
+    def generate_rep_layout(self) -> Tuple[torch.LongTensor, ...]:
         if len(self.rep_dims) == 1:
-            return self._generate_rep_layout_1d(self.metadata[0]).unsqueeze(0).long()
+            return self._generate_rep_layout_1d(self.metadata[0]),
         elif len(self.rep_dims) == 2:
             rep_layout_0 = self._generate_rep_layout_1d(self.metadata[0])
             rep_layout_1 = self._generate_rep_layout_1d(self.metadata[1])
-            return torch.stack([rep_layout_0, rep_layout_1], dim=0).long()
+            return rep_layout_0, rep_layout_1
         else:
             raise NotImplementedError
 
     @staticmethod
-    def _generate_rep_layout_1d(metadata1d):
+    def _generate_rep_layout_1d(metadata1d) -> torch.LongTensor:
         n_irreps_per_l = torch.arange(start=0, end=metadata1d.size(0)) * 2 + 1
         end_channelids = torch.cumsum(metadata1d, dim=0)
-        start_channelids = (torch.cat([torch.LongTensor([0]), end_channelids[:-1]]),)
+        start_channelids = torch.cat([torch.LongTensor([0]), end_channelids[:-1]])
         dst_ls = torch.repeat_interleave(
             torch.arange(n_irreps_per_l.size(0)), n_irreps_per_l * metadata1d
         )
@@ -336,14 +336,15 @@ class SphericalTensor:
             torch.cat([torch.arange(0, n_irreps) for n_irreps in n_irreps_per_l]),
             torch.repeat_interleave(metadata1d, n_irreps_per_l),
         )
+        ns = torch.arange(metadata1d.sum())
         dst_ns = torch.cat(
             [
-                torch.arange(start_channelids[l], end_channelids[l]).repeat(n_irreps)
+                ns[start_channelids[l]: end_channelids[l]].repeat(n_irreps)
                 for l, n_irreps in enumerate(n_irreps_per_l)
             ]
         )
-        rep_layout = torch.stack([dst_ls, dst_ms, dst_ns], dim=0)
-        assert rep_layout.shape[0] == torch.sum(n_irreps_per_l * metadata1d)
+        rep_layout = torch.stack([dst_ls, dst_ms, dst_ns], dim=0).long()
+        assert rep_layout.shape[1] == torch.sum(n_irreps_per_l * metadata1d)
 
         return rep_layout
 
@@ -351,5 +352,5 @@ class SphericalTensor:
         # Do not transfer metadata to GPU, as index tracking should be more efficient
         # on CPUs
         self.ten = self.ten.to(device)
-        self.rep_layout = self.rep_layout.to(device)
+        self.rep_layout = (layout.to(device) for layout in self.rep_layout)
         return self

@@ -3,7 +3,7 @@ import torch
 
 class NormContraction1d(torch.autograd.Function):
     """
-    Calculate the (stabilized) L2-norm of a 1d spherical tensor
+    Calculate the (stabilized) channel-wise L2-norm of a 1d spherical tensor
     The representation dimension must be an integer
     The gradients at zero are enforced to be 0 by a non-negative eps
     """
@@ -32,7 +32,7 @@ class NormContraction1d(torch.autograd.Function):
 
 class NormContraction2d(torch.autograd.Function):
     """
-    Calculate the (stabilized) L2-norm of a 2d spherical tensor
+    Calculate the (stabilized) channel-wise L2 matrix-norm of a 2d spherical tensor
     The representation dimensions must be a 2-tuple (i, i+1)
     """
 
@@ -81,3 +81,14 @@ class NormContraction2d(torch.autograd.Function):
         norm_grad = data_ten / gathered_norm_shifted
         grad_input = gathered_grad_output * norm_grad
         return grad_input, None, None, None, None
+
+
+class IrrepBroadcast(torch.autograd.Function):
+    """
+    Specialized functional for broadcasting scalar features with
+     a SO(3) kernel of identical channel-sizes per angular quantum number l
+    """
+
+    @staticmethod
+    def forward(ctx, kernel, feature, metadata):
+        raise NotImplementedError
