@@ -7,6 +7,7 @@ The evalulation scheme and ordering of representations follows:
 
 import torch
 from scipy.special import binom, factorial
+
 from torch_gauge.o3.spherical import SphericalTensor
 
 
@@ -17,27 +18,30 @@ def vm(m):
 def get_c_lmtuv(l, m, t, u, v):
 
     c = (
-            (-1) ** (t + v - vm(m))
-            * (1 / 4) ** t
-            * binom(l, t)
-            * binom(l - t, torch.abs(m) + t)
-            * binom(t, u)
-            * binom(torch.abs(m), 2 * v)
+        (-1) ** (t + v - vm(m))
+        * (1 / 4) ** t
+        * binom(l, t)
+        * binom(l - t, torch.abs(m) + t)
+        * binom(t, u)
+        * binom(torch.abs(m), 2 * v)
     )
     assert c != 0
     return c
 
 
 def get_ns_lm(l, m):
-    return 1 / (2 ** torch.abs(m) * factorial(l)) \
-           * torch.sqrt(2 * factorial(l + torch.abs(m)) * factorial(l - torch.abs(m)) / 2 ** (m == 0))
+    return (1 / (2 ** torch.abs(m) * factorial(l))) * torch.sqrt(
+        2 * factorial(l + torch.abs(m)) * factorial(l - torch.abs(m)) / 2 ** (m == 0)
+    )
 
 
 def get_xyzcoeff_lm(l, m):
     ts, us, vs = [], [], []
     for t in torch.arange((l - torch.abs(m)) // 2 + 1):
         for u in torch.arange(t):
-            for v in torch.arange(vm(m), torch.floor(torch.abs(m)/2 - vm(m)).long() + vm(m) + 1):
+            for v in torch.arange(
+                vm(m), torch.floor(torch.abs(m) / 2 - vm(m)).long() + vm(m) + 1
+            ):
                 ts.append(t)
                 us.append(u)
                 vs.append(v)
@@ -65,14 +69,16 @@ class RSHxyz(torch.nn.Module):
     def _init_coefficients(self):
         dst_pointers, xyzpows, ns_lms = [], [], []
         for l in torch.arange(self.max_l):
-            for m in torch.arange(-l, l+1):
+            for m in torch.arange(-l, l + 1):
                 ns_lm = get_ns_lm(l, m)
                 clm_tuv, xyzpowlm = get_xyzcoeff_lm(l, m)
-                dst_pointer = torch.ones_like(clm_tuv) * (l*(l+1)+m)
+                dst_pointer = torch.ones_like(clm_tuv) * (l * (l + 1) + m)
                 dst_pointers.append(dst_pointer)
                 xyzpows.append(xyzpowlm)
                 ns_lms.append(ns_lm)
-        self.dst_pointers = torch.nn.Parameter(torch.cat(dst_pointers), requires_grad=False)
+        self.dst_pointers = torch.nn.Parameter(
+            torch.cat(dst_pointers), requires_grad=False
+        )
         self.xyzpows = torch.nn.Parameter(torch.cat(xyzpows), requires_grad=False)
         self.ns_lms = torch.nn.Parameter(torch.cat(ns_lms), requires_grad=False)
 
