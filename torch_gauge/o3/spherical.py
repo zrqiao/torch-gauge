@@ -316,7 +316,7 @@ class SphericalTensor:
 
     def generate_rep_layout(self) -> Tuple[torch.LongTensor, ...]:
         if len(self.rep_dims) == 1:
-            return self._generate_rep_layout_1d(self.metadata[0]),
+            return (self._generate_rep_layout_1d(self.metadata[0]),)
         elif len(self.rep_dims) == 2:
             rep_layout_0 = self._generate_rep_layout_1d(self.metadata[0])
             rep_layout_1 = self._generate_rep_layout_1d(self.metadata[1])
@@ -339,7 +339,7 @@ class SphericalTensor:
         ns = torch.arange(metadata1d.sum())
         dst_ns = torch.cat(
             [
-                ns[start_channelids[l]: end_channelids[l]].repeat(n_irreps)
+                ns[start_channelids[l] : end_channelids[l]].repeat(n_irreps)
                 for l, n_irreps in enumerate(n_irreps_per_l)
             ]
         )

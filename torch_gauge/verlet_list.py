@@ -3,6 +3,8 @@ from typing import List
 
 import torch
 
+from torch_gauge.o3.spherical import SphericalTensor
+
 
 @dataclass
 class VerletList:
@@ -90,24 +92,17 @@ class VerletList:
         # edata can be understood as node data with additional "neighborhood" dimensions
         # To make padding easier, always unsqueeze at least one trailing dimension
         self.edata = {
-            k: torch.zeros(
-                self.n_nodes,
-                self.PADSIZE,
-                *edata.shape[2:],
-                dtype=edata.dtype,
-            )
-            .view(self.n_nodes, self.PADSIZE, -1)
-            .masked_scatter_(
-                mask=self.edge_mask.unsqueeze(-1),
-                source=edata[verlet_mask, ...].view(src_raw.shape[0], -1),
-            )
-            .view(self.n_nodes, self.PADSIZE, *edata.shape[2:])
+            k: self._scatter_efeat(edata, verlet_mask, src_raw)
             for k, edata in two_body_data.items()
         }
 
         return self
 
     def from_dgl(self, g: "dgl.DGLGraph", padding_size, nkeys, ekeys):
+        """
+        The interface for generating Verlet-list from dgl.DGLGraph
+        Only scalar type tensors are supported
+        """
         self.PADSIZE = padding_size
         self.n_nodes = g.num_nodes()
         self.batch_num_nodes = torch.LongTensor([self.n_nodes])
@@ -163,8 +158,6 @@ class VerletList:
         )
 
         self.ndata = {k: g.ndata[k] for k in nkeys}
-        # edata can be understood as node data with additional "neighborhood" dimensions
-        # To make padding easier, always unsqueeze at least one trailing dimension
         self.edata = {
             k: torch.zeros(
                 self.n_nodes * self.PADSIZE,
@@ -181,8 +174,46 @@ class VerletList:
             .view(self.n_nodes, self.PADSIZE, *g.edata[k].shape[1:])
             for k in ekeys
         }
-
         return self
+
+    def _scatter_efeat(self, edata, verlet_mask, src_raw):
+        if isinstance(edata, torch.Tensor):
+            return (
+                torch.zeros(
+                    self.n_nodes,
+                    self.PADSIZE,
+                    *edata.shape[2:],
+                    dtype=edata.dtype,
+                )
+                .view(self.n_nodes, self.PADSIZE, -1)
+                .masked_scatter_(
+                    mask=self.edge_mask.unsqueeze(-1),
+                    source=edata[verlet_mask, ...].view(src_raw.shape[0], -1),
+                )
+                .view(self.n_nodes, self.PADSIZE, *edata.shape[2:])
+            )
+        elif isinstance(edata, SphericalTensor):
+            out_ten = (
+                torch.zeros(
+                    self.n_nodes,
+                    self.PADSIZE,
+                    *edata.shape[2:],
+                    dtype=edata.ten.dtype,
+                )
+                .view(self.n_nodes, self.PADSIZE, -1)
+                .masked_scatter_(
+                    mask=self.edge_mask.unsqueeze(-1),
+                    source=edata.ten[verlet_mask, ...].view(src_raw.shape[0], -1),
+                )
+                .view(self.n_nodes, self.PADSIZE, *edata.shape[2:])
+            )
+            return SphericalTensor(
+                out_ten,
+                rep_dims=edata.rep_dims,
+                metadata=edata.metadata,
+                rep_layout=edata.rep_layout,
+                num_channels=edata.num_channels,
+            )
 
     def query_src(self, src_feat):
         """
@@ -191,15 +222,29 @@ class VerletList:
          view (k+1 hop) of the underlying k-hop graph structure.
         src_feat must be contiguous.
         """
-        flattened2d_src = src_feat.view(src_feat.shape[0], -1)
         flattened_neighboridx = self.neighbor_idx.view(-1)
-        flattened_out = (
-            flattened2d_src[flattened_neighboridx, ...]
-            .view(*self.neighbor_idx.shape, flattened2d_src.shape[1])
-            .mul_(self.edge_mask.unsqueeze(2))
-        )
-
-        return flattened_out.view(*self.neighbor_idx.shape, *src_feat.shape[1:])
+        if isinstance(src_feat, torch.Tensor):
+            flattened2d_src = src_feat.view(src_feat.shape[0], -1)
+            flattened_out = (
+                flattened2d_src[flattened_neighboridx, ...]
+                .view(*self.neighbor_idx.shape, flattened2d_src.shape[1])
+                .mul_(self.edge_mask.unsqueeze(2))
+            )
+            return flattened_out.view(*self.neighbor_idx.shape, *src_feat.shape[1:])
+        elif isinstance(src_feat, SphericalTensor):
+            flattened2d_src = src_feat.ten.view(src_feat.ten.shape[0], -1)
+            flattened_out = (
+                flattened2d_src[flattened_neighboridx, ...]
+                .view(*self.neighbor_idx.shape, flattened2d_src.shape[1])
+                .mul_(self.edge_mask.unsqueeze(2))
+            )
+            return SphericalTensor(
+                flattened_out.view(*self.neighbor_idx.shape, *src_feat.shape[1:]),
+                rep_dims=tuple(dim + 1 for dim in src_feat.rep_dims),
+                metadata=src_feat.metadata,
+                rep_layout=src_feat.rep_layout,
+                num_channels=src_feat.num_channels,
+            )
 
     def to_src_first_view(self, data):
         """
@@ -208,11 +253,26 @@ class VerletList:
         scatter_ten = (self.neighbor_idx * self.PADSIZE + self._dst_edim_locators)[
             self.edge_mask
         ]
-        out_ten = torch.zeros_like(data).view(self.n_nodes * self.PADSIZE, -1)
-        out_ten[scatter_ten, :] = data.view(self.n_nodes, self.PADSIZE, -1)[
-            self.edge_mask, :
-        ]
-        return out_ten.view_as(data)
+        if isinstance(data, torch.Tensor):
+            out_ten = torch.zeros_like(data).view(self.n_nodes * self.PADSIZE, -1)
+            out_ten[scatter_ten, :] = data.view(self.n_nodes, self.PADSIZE, -1)[
+                self.edge_mask, :
+            ]
+            return out_ten.view_as(data)
+        elif isinstance(data, SphericalTensor):
+            out_ten = torch.zeros_like(data.ten).view(self.n_nodes * self.PADSIZE, -1)
+            out_ten[scatter_ten, :] = data.ten.view(self.n_nodes, self.PADSIZE, -1)[
+                self.edge_mask, :
+            ]
+            return SphericalTensor(
+                out_ten.view_as(data.ten),
+                rep_dims=data.rep_dims,
+                metadata=data.metadata,
+                rep_layout=data.rep_layout,
+                num_channels=data.num_channels,
+            )
+        else:
+            raise NotImplementedError
 
     def to(self, device):
         self.neighbor_idx = self.neighbor_idx.to(device)
