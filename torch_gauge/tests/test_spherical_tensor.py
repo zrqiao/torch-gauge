@@ -29,7 +29,9 @@ def test_spherical_tensor_layout1d():
     )
     assert torch.all(
         test_sp_ten.rep_layout[0][1].eq(
-            torch.LongTensor([0, 0, 0, 1, 1, 2, 2, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5, 6])
+            torch.LongTensor(
+                [0, -1, -1, 0, 0, 1, 1, -2, -1, 0, 1, 2, -3, -2, -1, 0, 1, 2, 3]
+            )
         )
     )
     assert torch.all(
@@ -40,7 +42,7 @@ def test_spherical_tensor_layout1d():
     return 0
 
 
-def test_spherical_tensor_scalar_product():
+def test_spherical_tensor_scalar_product_1d():
     dten = torch.tensor(
         [
             [1.1, 2.2, 0.5, 0.6, -0.6, 0.9, 0.7, 0.3, 0.1, 0.2, 0.3, 0.4, 0.5],
@@ -76,6 +78,44 @@ def test_spherical_tensor_scalar_product():
         rtol=1e-7,
     )
     assert torch.all(dten_inplace.rep_layout[0].eq(test_sp_ten.rep_layout[0]))
+
+
+def test_spherical_tensor_scalar_product_2d():
+    metadata2d = torch.LongTensor([[2, 1], [1, 1]])
+    test_2d = SphericalTensor(
+        torch.tensor(
+            [
+                [0.1, 0.3, 0.3, 0.3],
+                [0.2, -0.7, 0.1, -0.2],
+                [0.3, 0.2, -0.3, 0.4],
+                [0.2, 0.3, 0.4, -0.5],
+                [0.1, 0.2, 0.3, 0.4],
+            ]
+        ),
+        (
+            0,
+            1,
+        ),
+        metadata2d,
+    )
+    scale_2d = torch.tensor(
+        [
+            [1.0, 2.0],
+            [3.0, 4.0],
+            [5.0, 6.0],
+        ]
+    )
+    out_ten = test_2d.scalar_mul(scale_2d).ten
+    ref_ten = torch.tensor(
+        [
+            [0.1, 0.6, 0.6, 0.6],
+            [0.6, -2.8, 0.4, -0.8],
+            [1.5, 1.2, -1.8, 2.4],
+            [1.0, 1.8, 2.4, -3.0],
+            [0.5, 1.2, 1.8, 2.4],
+        ]
+    )
+    assert torch.allclose(out_ten, ref_ten, atol=1e-7, rtol=1e-5)
 
 
 def test_spherical_tensor_dot_product():
@@ -137,6 +177,25 @@ def test_spherical_tensor_rep_dot():
     )
 
 
+def test_spherical_tensor_rep_outer():
+    dten1 = torch.rand(101)
+    metadata = torch.LongTensor([[7, 9, 1, 5, 3]])
+    test1 = SphericalTensor(dten1, (0,), metadata)
+    dten2 = torch.rand(101)
+    test2 = SphericalTensor(dten2, (0,), metadata)
+    test_outer = test1.rep_outer(test2)
+    assert test_outer.ten.shape == (101, 101)
+    assert torch.all(test_outer.ten.eq(torch.outer(dten1, dten2)))
+    assert torch.all(
+        test_outer.metadata.eq(torch.tensor([[7, 9, 1, 5, 3], [7, 9, 1, 5, 3]]))
+    )
+    test3 = SphericalTensor(torch.rand(4, 6, 12, 101, 7), (3,), metadata)
+    test4 = SphericalTensor(
+        torch.rand(4, 6, 12, 12, 7), (3,), torch.LongTensor([[1, 2, 1, 0, 0]])
+    )
+    assert test3.rep_outer(test4).shape == (4, 6, 12, 101, 12, 7)
+
+
 def test_spherical_tensor_invariant_contraction():
     metadata1d = torch.LongTensor([[2, 2]])
     test_1d = SphericalTensor(
@@ -145,8 +204,8 @@ def test_spherical_tensor_invariant_contraction():
     assert torch.allclose(
         test_1d.invariant(),
         torch.tensor([0.2, -0.7, 0.4358, 0.4898]),
-        atol=1e-5,
-        rtol=1e-4,
+        atol=1e-4,
+        rtol=0,
     )
 
     metadata2d = torch.LongTensor([[1, 1], [1, 1]])
@@ -169,5 +228,5 @@ def test_spherical_tensor_invariant_contraction():
         test_2d.invariant(),
         torch.tensor([[0.2, 0.73484], [0.37416, 1.03923]]),
         atol=1e-4,
-        rtol=1e-3,
+        rtol=0,
     )

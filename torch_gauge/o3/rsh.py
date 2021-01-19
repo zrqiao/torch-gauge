@@ -84,7 +84,7 @@ class RSHxyz(torch.nn.Module):
             torch.cat(dst_pointers).long(), requires_grad=False
         )
         self.clm_tuvs = torch.nn.Parameter(
-            torch.cat(clmtuvs, dim=0).float(), requires_grad=False
+            torch.cat(clmtuvs, dim=0), requires_grad=False
         )
         self.xyzpows = torch.nn.Parameter(
             torch.cat(xyzpows, dim=1).long(), requires_grad=False
@@ -103,7 +103,7 @@ class RSHxyz(torch.nn.Module):
         out = out.scatter_add_(
             dim=1,
             index=self.dst_pointers.unsqueeze(0).expand_as(xyz_poly),
-            src=xyz_poly * self.clm_tuvs.unsqueeze(0),
+            src=xyz_poly * self.clm_tuvs.to(xyz.dtype).unsqueeze(0),
         )
         out = out.mul_(self.ns_lms)
         out = out.view(*in_shape[:-1], self.ns_lms.shape[0])

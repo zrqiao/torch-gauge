@@ -15,7 +15,7 @@ class SphericalTensor:
     All angular and magnetic quantum number indices are treated as equivalent,
      and all non-degenerate feature channels are regarded as the "principal"
      indices, n. Note that the angular quantum number indices (m) for each l
-     range from 0 to 2l, instead of -l to l in the "physicist's" convention.
+     range from -l to l as in the physicist's convention.
 
     Two indexing tensors are maintained, ``metadata`` and ``rep_layout``.
     Attributes:
@@ -208,32 +208,29 @@ class SphericalTensor:
         else:
             raise NotImplementedError
 
-    def outer(self, other: "SphericalTensor") -> "SphericalTensor":
+    def rep_outer(self, other: "SphericalTensor") -> "SphericalTensor":
         """
         Returns the batched outer product of two 1-d spherical tensors
-        The rep_dim of self and other much be contiguous
+        The rep_dim and metadata of self and other much be the same
         """
         assert len(self.rep_dims) == 1
         assert len(other.rep_dims) == 1
-        if self.rep_dims[0] + 1 == other.rep_dims[0]:
-            odim = self.rep_dims[0]
-            a, b = self, other
-        elif self.rep_dims[0] - 1 == other.rep_dims[0]:
-            odim = other.rep_dims[0]
-            a, b = other, self
-        else:
-            raise AssertionError(
-                "The representation dimensions of self and other must be contiguous"
-            )
-        out_ten = a.ten.unsqueeze(odim + 1).mul(b.ten.unsqueeze(odim))
-        out_metadata = torch.cat([a.metadata, b.metadata], dim=0)
-        out_rep_layout = (a.rep_layout, b.rep_layout)
+        assert (
+            self.rep_dims[0] == other.rep_dims[0]
+        ), "The representation dimensions of self and other must be contiguous"
+        odim = self.rep_dims[0]
+        out_ten = self.ten.unsqueeze(odim + 1).mul(other.ten.unsqueeze(odim))
+        out_metadata = torch.cat([self.metadata, other.metadata], dim=0)
+        out_rep_layout = (
+            self.rep_layout,
+            other.rep_layout,
+        )
         return SphericalTensor(
             out_ten,
             rep_dims=(odim, odim + 1),
             metadata=out_metadata,
             rep_layout=out_rep_layout,
-            num_channels=(a.num_channels, b.num_channels),
+            num_channels=(self.num_channels, other.num_channels),
         )
 
     def fold(self, stride: int, update_self=False) -> "SphericalTensor":
@@ -347,7 +344,12 @@ class SphericalTensor:
             torch.arange(n_irreps_per_l.size(0)), n_irreps_per_l * metadata1d
         )
         dst_ms = torch.repeat_interleave(
-            torch.cat([torch.arange(0, n_irreps) for n_irreps in n_irreps_per_l]),
+            torch.cat(
+                [
+                    torch.arange(-l, l + 1)
+                    for l in torch.arange(start=0, end=metadata1d.size(0))
+                ]
+            ),
             torch.repeat_interleave(metadata1d, n_irreps_per_l),
         )
         ns = torch.arange(metadata1d.sum())
