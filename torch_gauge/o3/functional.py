@@ -45,8 +45,7 @@ class NormContraction2d(torch.autograd.Function):
         dims,
         eps,
     ):
-        # TODO: double-check the column-first behavior
-        shape_rep_out = out_shape[dims]
+        shape_rep_out = tuple(out_shape[d] for d in dims)
         cache_inds = (
             idx_tens[0] * shape_rep_out[1] + idx_tens[1]
         )  # flattened dst indices
@@ -57,7 +56,7 @@ class NormContraction2d(torch.autograd.Function):
             dtype=data_ten.dtype,
         ).flatten(*dims)
         sum_sqr = sum_sqr.scatter_add_(
-            dim=dims[0], index=cache_inds, src=data_ten.pow(2)
+            dim=dims[0], index=cache_inds, src=data_ten.flatten(*dims).pow(2)
         )
         norm_cache_shifted = (sum_sqr + eps**2).sqrt()
         norm_shifted = norm_cache_shifted.view(

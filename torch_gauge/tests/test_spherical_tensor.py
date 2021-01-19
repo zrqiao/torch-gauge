@@ -131,3 +131,27 @@ def test_spherical_tensor_rep_dot():
         atol=1e-4,
         rtol=1e-3,
     )
+
+
+def test_spherical_tensor_invariant():
+    metadata1d = torch.LongTensor([[2, 2]])
+    test_1d = SphericalTensor(torch.tensor([0.2, -0.7, 0.1, -0.2, 0.3, 0.2, -0.3, 0.4]), (0,), metadata1d)
+    assert torch.allclose(
+        test_1d.invariant(),
+        torch.tensor([0.2, -0.7, 0.4358, 0.4898]),
+        atol=1e-5,
+        rtol=1e-4,
+    )
+
+    metadata2d = torch.LongTensor([[1, 1], [1, 1]])
+    test_2d = SphericalTensor(
+        torch.tensor([
+            [0.2, -0.7, 0.1, -0.2], [0.3, 0.2, -0.3, 0.4], [0.2, 0.3, 0.4, -0.5], [0.1, 0.2, 0.3, 0.4]
+        ]), (0, 1,), metadata2d
+    )
+    assert torch.allclose(
+        test_2d.invariant(),
+        torch.tensor([[0.2, 0.73484], [0.37416, 1.03923]]),
+        atol=1e-4,
+        rtol=1e-3,
+    )
