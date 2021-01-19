@@ -178,7 +178,9 @@ class SphericalTensor:
         dotdim_idx = self.rep_dims.index(dim)
         assert other.rep_dims[0] == dim
         assert torch.all(self.metadata[dotdim_idx].eq(other.metadata[0]))
-        singleton_shape = tuple(self.ten.shape[d] if d == dim else 1 for d in range(self.ten.dim()))
+        singleton_shape = tuple(
+            self.ten.shape[d] if d == dim else 1 for d in range(self.ten.dim())
+        )
         mul_ten = self.ten * other.ten
         out_shape = list(mul_ten.shape)
         out_shape[dim] = self.num_channels[dotdim_idx]
@@ -271,9 +273,7 @@ class SphericalTensor:
         if len(self.rep_dims) == 1:
             l0_length = self.metadata[0, 0]
             ops_dim = self.rep_dims[0]
-            data_l0 = torch.narrow(
-                self.ten, dim=ops_dim, start=0, length=l0_length
-            )
+            data_l0 = torch.narrow(self.ten, dim=ops_dim, start=0, length=l0_length)
             norm_shape = list(self.shape)
             norm_shape[ops_dim] = self.num_channels[0] - l0_length
             data_rep = torch.narrow(
@@ -282,10 +282,13 @@ class SphericalTensor:
                 start=l0_length,
                 length=self.ten.shape[ops_dim] - l0_length,
             )
-            singleton_shape = tuple(data_rep.shape[d] if d == ops_dim else 1 for d in range(data_rep.dim()))
+            singleton_shape = tuple(
+                data_rep.shape[d] if d == ops_dim else 1 for d in range(data_rep.dim())
+            )
             # Subtract the L=0 offset in the pointer tensor
             idx_ten = (
-                self.rep_layout[0][2, l0_length:].sub(l0_length)
+                self.rep_layout[0][2, l0_length:]
+                .sub(l0_length)
                 .view(singleton_shape)
                 .expand_as(data_rep)
             )
@@ -295,10 +298,12 @@ class SphericalTensor:
             return torch.cat([data_l0, invariant_rep], dim=ops_dim)
         elif len(self.rep_dims) == 2:
             singleton_shape_0 = tuple(
-                self.ten.shape[d] if d == self.rep_dims[0] else 1 for d in range(self.ten.dim())
+                self.ten.shape[d] if d == self.rep_dims[0] else 1
+                for d in range(self.ten.dim())
             )
             singleton_shape_1 = tuple(
-                self.ten.shape[d] if d == self.rep_dims[1] else 1 for d in range(self.ten.dim())
+                self.ten.shape[d] if d == self.rep_dims[1] else 1
+                for d in range(self.ten.dim())
             )
             idx_ten_0 = (
                 self.rep_layout[0][2, :]

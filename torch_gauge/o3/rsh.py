@@ -25,27 +25,30 @@ def get_c_lmtuv(l, m, t, u, v):
         * binom(t, u)
         * binom(torch.abs(m), 2 * v)
     )
-    assert c != 0
+    assert (c != 0).any()
     return c
 
 
 def get_ns_lm(l, m):
     return (1 / (2 ** torch.abs(m) * factorial(l))) * torch.sqrt(
-        2 * factorial(l + torch.abs(m)) * factorial(l - torch.abs(m)) / 2 ** (m == 0)
+        2
+        * factorial(l + torch.abs(m))
+        * factorial(l - torch.abs(m))
+        / (2 ** (m == 0).long())
     )
 
 
 def get_xyzcoeff_lm(l, m):
     ts, us, vs = [], [], []
     for t in torch.arange((l - torch.abs(m)) // 2 + 1):
-        for u in torch.arange(t):
+        for u in torch.arange(t + 1):
             for v in torch.arange(
                 vm(m), torch.floor(torch.abs(m) / 2 - vm(m)).long() + vm(m) + 1
             ):
                 ts.append(t)
                 us.append(u)
                 vs.append(v)
-    ts, us, vs = torch.cat(ts), torch.cat(us), torch.cat(vs)
+    ts, us, vs = torch.stack(ts), torch.stack(us), torch.stack(vs)
     xpows_lm = 2 * ts + torch.abs(m) - 2 * (us + vs)
     ypows_lm = 2 * (us + vs)
     zpows_lm = l - 2 * ts - torch.abs(m)
@@ -67,8 +70,8 @@ class RSHxyz(torch.nn.Module):
         self._init_coefficients()
 
     def _init_coefficients(self):
-        dst_pointers, xyzpows, ns_lms = [], [], []
-        for l in torch.arange(self.max_l):
+        dst_pointers, xyzpows, ns_lms, clmtuvs = [], [], [], []
+        for l in torch.arange(self.max_l + 1):
             for m in torch.arange(-l, l + 1):
                 ns_lm = get_ns_lm(l, m)
                 clm_tuv, xyzpowlm = get_xyzcoeff_lm(l, m)
@@ -76,25 +79,36 @@ class RSHxyz(torch.nn.Module):
                 dst_pointers.append(dst_pointer)
                 xyzpows.append(xyzpowlm)
                 ns_lms.append(ns_lm)
+                clmtuvs.append(clm_tuv)
         self.dst_pointers = torch.nn.Parameter(
-            torch.cat(dst_pointers), requires_grad=False
+            torch.cat(dst_pointers).long(), requires_grad=False
         )
-        self.xyzpows = torch.nn.Parameter(torch.cat(xyzpows), requires_grad=False)
-        self.ns_lms = torch.nn.Parameter(torch.cat(ns_lms), requires_grad=False)
+        self.clm_tuvs = torch.nn.Parameter(
+            torch.cat(clmtuvs, dim=0).float(), requires_grad=False
+        )
+        self.xyzpows = torch.nn.Parameter(
+            torch.cat(xyzpows, dim=1).long(), requires_grad=False
+        )
+        self.ns_lms = torch.nn.Parameter(
+            torch.stack(ns_lms, dim=0), requires_grad=False
+        )
 
     def forward(self, xyz) -> SphericalTensor:
         in_shape = xyz.shape
         xyz = xyz.view(-1, 3)
         xyz_poly = torch.pow(xyz.unsqueeze(-1), self.xyzpows.unsqueeze(0)).prod(dim=1)
-        out = torch.zeros(xyz.shape[0], self.ns_lms.shape[0], device=xyz.device)
+        out = torch.zeros(
+            xyz.shape[0], self.ns_lms.shape[0], device=xyz.device, dtype=xyz.dtype
+        )
         out = out.scatter_add_(
             dim=1,
-            index=self.dst_pointers.unsqueeze(0).expand_as(out),
-            src=xyz_poly,
+            index=self.dst_pointers.unsqueeze(0).expand_as(xyz_poly),
+            src=xyz_poly * self.clm_tuvs.unsqueeze(0),
         )
+        out = out.mul_(self.ns_lms)
         out = out.view(*in_shape[:-1], self.ns_lms.shape[0])
         return SphericalTensor(
             out,
-            rep_dims=(out.dims(),),
-            metadata=torch.ones(self.max_l.item(), dtype=torch.long),
+            rep_dims=(out.dim(),),
+            metadata=torch.ones((1, self.max_l + 1), dtype=torch.long),
         ).to(xyz.device)

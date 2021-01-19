@@ -3,7 +3,7 @@ import versioneer
 
 setup(
     name="torch_gauge",
-    description="A light-weight PyTorch extension for torch_gauge-equivariant geometric learning",
+    description="A light-weight PyTorch extension for gauge-equivariant geometric learning",
     author="Zhuoran Qiao",
     author_email="zqiao@caltech.edu",
     version=versioneer.get_version(),
