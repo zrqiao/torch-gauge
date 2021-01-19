@@ -142,16 +142,19 @@ class SphericalTensor:
         Args:
             other (SphericalTensor): must be a 1-d spherical tensor
             with the same number of dimensions and broadcastable to self.ten.
+            When self.n_rep_dim==2, the kept dimension in self.rep_dims
+             of other must be singleton.
             dim (int): the dimension to perform the inner product.
         """
         dotdim_idx = self.rep_dims.index(dim)
         assert other.rep_dims[0] == dim
-        assert self.metadata[dotdim_idx] == other.metadata[0]
+        assert torch.all(self.metadata[dotdim_idx].eq(other.metadata[0]))
         out_ten = self.ten.mul(other.ten).sum(dim)
         if len(self.rep_dims) == 1:
             return out_ten
         elif len(self.rep_dims) == 2:
             dimid_kept = 1 - dotdim_idx
+            assert other.ten.shape[self.rep_dims[dimid_kept]] == 1
             return SphericalTensor(
                 out_ten,
                 rep_dims=(self.rep_dims[dimid_kept],),
@@ -174,16 +177,16 @@ class SphericalTensor:
         """
         dotdim_idx = self.rep_dims.index(dim)
         assert other.rep_dims[0] == dim
-        assert self.metadata[dotdim_idx] == other.metadata[0]
-        singleton_shape = (-1 if d == dim else 1 for d in range(self.ten.dim()))
+        assert torch.all(self.metadata[dotdim_idx].eq(other.metadata[0]))
+        singleton_shape = tuple(-1 if d == dim else 1 for d in range(self.ten.dim()))
         mul_ten = self.ten * other.ten
-        out_shape = mul_ten.shape
+        out_shape = list(mul_ten.shape)
         out_shape[dim] = self.num_channels[dotdim_idx]
         out_ten = torch.zeros(
             out_shape, device=mul_ten.device, dtype=mul_ten.dtype
         ).scatter_add_(
             dim=dim,
-            index=self.rep_layout[dotdim_idx, 2, :]
+            index=self.rep_layout[dotdim_idx][2, :]
             .view(*singleton_shape)
             .expand_as(mul_ten),
             src=mul_ten,
@@ -266,21 +269,23 @@ class SphericalTensor:
         When self.n_rep_dim==2, the (l1=0, l2=0) channels are also contracted.
         """
         if len(self.rep_dims) == 1:
+            l0_length = self.metadata[0, 0]
             ops_dim = self.rep_dims[0]
             data_l0 = torch.narrow(
-                self.ten, dim=ops_dim, start=0, length=self.metadata[0, 0]
+                self.ten, dim=ops_dim, start=0, length=l0_length
             )
-            norm_shape = self.shape
-            norm_shape[ops_dim] = self.num_channels[0]
-            singleton_shape = (-1 if d == ops_dim else 1 for d in range(self.ten.dim()))
+            norm_shape = list(self.shape)
+            norm_shape[ops_dim] = self.num_channels[0] - l0_length
             data_rep = torch.narrow(
                 self.ten,
                 dim=ops_dim,
-                start=self.metadata[0, 0],
-                length=self.ten.shape[ops_dim] - self.metadata[0, 0],
+                start=l0_length,
+                length=self.ten.shape[ops_dim] - l0_length,
             )
+            singleton_shape = tuple(-1 if d == ops_dim else 1 for d in range(data_rep.dim()))
+            # Subtract the L=0 offset in the pointer tensor
             idx_ten = (
-                self.rep_layout[0][2, self.metadata[0, 0] :]
+                self.rep_layout[0][2, l0_length:].sub(l0_length)
                 .view(singleton_shape)
                 .expand_as(data_rep)
             )
@@ -289,7 +294,7 @@ class SphericalTensor:
             )
             return torch.cat([data_l0, invariant_rep], dim=ops_dim)
         elif len(self.rep_dims) == 2:
-            singleton_shape = (
+            singleton_shape = tuple(
                 -1 if d in self.rep_dims else 1 for d in range(self.ten.dim())
             )
             idx_ten_0 = (
@@ -305,7 +310,7 @@ class SphericalTensor:
                 .expand_as(self.ten)
             )
             idx_tens = torch.stack([idx_ten_0, idx_ten_1], dim=0)
-            norm_shape = self.shape
+            norm_shape = list(self.shape)
             norm_shape[self.rep_dims] = self.num_channels
             invariant2d = NormContraction2d.apply(
                 self.ten, idx_tens, norm_shape, self.rep_dims, self._norm_eps

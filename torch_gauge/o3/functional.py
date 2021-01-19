@@ -15,7 +15,7 @@ class NormContraction1d(torch.autograd.Function):
         sum_sqr = torch.zeros(
             out_shape, device=data_ten.device, dtype=data_ten.dtype
         ).scatter_add_(dim=dim, index=idx_ten, src=data_ten.pow(2))
-        norm_shifted = (sum_sqr + eps.mul(eps)).sqrt()
+        norm_shifted = (sum_sqr + eps**2).sqrt()
         ctx.dim = dim
         ctx.save_for_backward(data_ten, idx_ten, norm_shifted)
         return norm_shifted - eps
@@ -59,7 +59,7 @@ class NormContraction2d(torch.autograd.Function):
         sum_sqr = sum_sqr.scatter_add_(
             dim=dims[0], index=cache_inds, src=data_ten.pow(2)
         )
-        norm_cache_shifted = (sum_sqr + eps.mul(eps)).sqrt()
+        norm_cache_shifted = (sum_sqr + eps**2).sqrt()
         norm_shifted = norm_cache_shifted.view(
             out_shape
         )  # must be contiguous at this point
