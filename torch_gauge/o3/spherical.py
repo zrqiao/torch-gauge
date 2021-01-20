@@ -330,16 +330,16 @@ class SphericalTensor:
 
     def generate_rep_layout(self) -> Tuple[torch.LongTensor, ...]:
         if len(self.rep_dims) == 1:
-            return (self._generate_rep_layout_1d(self.metadata[0]),)
+            return (self.generate_rep_layout_1d(self.metadata[0]),)
         elif len(self.rep_dims) == 2:
-            rep_layout_0 = self._generate_rep_layout_1d(self.metadata[0])
-            rep_layout_1 = self._generate_rep_layout_1d(self.metadata[1])
+            rep_layout_0 = self.generate_rep_layout_1d(self.metadata[0])
+            rep_layout_1 = self.generate_rep_layout_1d(self.metadata[1])
             return rep_layout_0, rep_layout_1
         else:
             raise NotImplementedError
 
     @staticmethod
-    def _generate_rep_layout_1d(metadata1d) -> torch.LongTensor:
+    def generate_rep_layout_1d(metadata1d) -> torch.LongTensor:
         n_irreps_per_l = torch.arange(start=0, end=metadata1d.size(0)) * 2 + 1
         end_channelids = torch.cumsum(metadata1d, dim=0)
         start_channelids = torch.cat([torch.LongTensor([0]), end_channelids[:-1]])

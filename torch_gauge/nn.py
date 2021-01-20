@@ -3,7 +3,7 @@ import torch
 from torch_gauge.o3.spherical import SphericalTensor
 
 
-class IEILinear(torch.nn.Module):
+class IELin(torch.nn.Module):
     r"""
     Irrep-wise Equivariant Linear Layer
 
@@ -38,32 +38,57 @@ class IEILinear(torch.nn.Module):
         assert len(metadata_in) == len(metadata_out)
         self._metadata_in = metadata_in
         self._metadata_out = metadata_out
+        n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0)) * 2 + 1
         # The bias must be False
         self.linears = torch.nn.ModuleList(
             [
-                torch.nn.Linear(metadata_in[l], metadata_out[l], bias=False)
+                torch.nn.Linear(
+                    metadata_in[l] * n_irreps_per_l[l],
+                    metadata_out[l] * n_irreps_per_l[l],
+                    bias=False,
+                )
+                if self._metadata_out[l] > 0
+                else None
                 for l, _ in enumerate(metadata_in)
             ]
         )
-        n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0)) * 2 + 1
         self._end_inds_in = torch.cumsum(self._metadata_in * n_irreps_per_l, dim=0)
-        self._start_inds_in = (
-            torch.cat([torch.LongTensor([0]), self._end_inds_in[:-1]]),
-        )
+        self._start_inds_in = torch.cat([torch.LongTensor([0]), self._end_inds_in[:-1]])
+        self.out_layout = SphericalTensor.generate_rep_layout_1d(self._metadata_out)
+        self.num_out_channels = torch.sum(self._metadata_out * n_irreps_per_l).item()
 
-    def forward(self, x: SphericalTensor) -> torch.Tensor:
-        assert x.metadata == self._metadata_in
+    def forward(self, x: SphericalTensor) -> SphericalTensor:
+        assert x.rep_dims[-1] == x.ten.dim() - 1
+        assert torch.all(x.metadata[-1].eq(self._metadata_in)), (
+            f"Expected the SphericalTensor x and self._metadata_in to have the "
+            f"same irrep metadata along the last dimension, got {x.metadata[-1]}"
+            f" and {self._metadata_in} instead"
+        )
         # TODO: vectorization
         outs = []
-        for l, linear_l in enumerate(self._metadata_in):
-            in_l = x.ten[..., self._start_inds_in[l] : self._end_inds_in[l]]
-            out_l = linear_l(in_l.view(2 * l + 1, -1)).view(-1)
+        for l, linear_l in enumerate(self.linears):
+            if linear_l is None:
+                continue
+            in_l = x.ten[
+                ..., self._start_inds_in[l] : self._end_inds_in[l]
+            ].contiguous()
+            out_l = linear_l(in_l)
             outs.append(out_l)
 
-        return torch.cat(outs, dim=-1)
+        out_ten = torch.cat(outs, dim=-1)
+        out_metadata = x.metadata.clone()
+        out_metadata[-1] = self._metadata_out
+        out_rep_layout = x.rep_layout[:-1] + (self.out_layout,)
+        return SphericalTensor(
+            out_ten,
+            rep_dims=x.rep_dims,
+            metadata=out_metadata,
+            rep_layout=out_rep_layout,
+            num_channels=x.num_channels[:-1] + (self.num_out_channels,),
+        )
 
 
-class RepNorm(torch.nn.Module):
+class RepNorm1d(torch.nn.Module):
     r"""
     The (experimental) Representation Normalization layer.
 
@@ -83,12 +108,15 @@ class RepNorm(torch.nn.Module):
         super().__init__()
         self._num_channels = num_channels
         self._eps = eps
-        self.batchnorm = torch.nn.BatchNorm1d(num_features=num_channels, momentum=momentum)
+        self.batchnorm = torch.nn.BatchNorm1d(
+            num_features=num_channels, momentum=momentum
+        )
         # TODO: initialization schemes
         self.beta = torch.nn.Parameter(torch.rand(self._dim))
 
     def forward(self, x: SphericalTensor) -> (torch.Tensor, SphericalTensor):
         x0 = x.invariant()
+        assert x0.dim() == 2
         x1 = self.batchnorm(x0)
         divisor = torch.abs(x0.mul(1 - self.beta) + self.beta) + self._eps
         x2 = x.scalar_mul(1 / divisor)
