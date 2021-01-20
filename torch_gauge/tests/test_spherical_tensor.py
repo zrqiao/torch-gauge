@@ -193,7 +193,12 @@ def test_spherical_tensor_rep_outer():
     test4 = SphericalTensor(
         torch.rand(4, 6, 12, 12, 7), (3,), torch.LongTensor([[1, 2, 1, 0, 0]])
     )
-    assert test3.rep_outer(test4).shape == (4, 6, 12, 101, 12, 7)
+    test_outer = test3.rep_outer(test4)
+    assert test_outer.shape == (4, 6, 12, 101, 12, 7)
+    assert test_outer.rep_dims == (3, 4)
+    assert torch.all(
+        test_outer.metadata.eq(torch.tensor([[7, 9, 1, 5, 3], [1, 2, 1, 0, 0]]))
+    )
 
 
 def test_spherical_tensor_invariant_contraction():

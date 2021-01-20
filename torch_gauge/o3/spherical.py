@@ -222,8 +222,8 @@ class SphericalTensor:
         out_ten = self.ten.unsqueeze(odim + 1).mul(other.ten.unsqueeze(odim))
         out_metadata = torch.cat([self.metadata, other.metadata], dim=0)
         out_rep_layout = (
-            self.rep_layout,
-            other.rep_layout,
+            self.rep_layout[0],
+            other.rep_layout[0],
         )
         return SphericalTensor(
             out_ten,
