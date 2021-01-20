@@ -18,7 +18,7 @@ def test_batch_rsh_generation():
 
 def test_rsh_explicit():
     rshmodule = RSHxyz(max_l=2)
-    # Compare to the explicit formula up to l=2
+    # Compare with the explicit formula up to l=2
     for _ in range(100):
         x = torch.normal(0, 1, size=(1,)).double()
         y = torch.normal(0, 1, size=(1,)).double()
@@ -47,7 +47,6 @@ def test_rsh_explicit():
 
 def test_rsh_batch_explicit():
     rshmodule = RSHxyz(max_l=2)
-    # Compare to the explicit formula up to l=2
     x = torch.normal(0, 1, size=(1024,)).double()
     y = torch.normal(0, 1, size=(1024,)).double()
     z = torch.normal(0, 1, size=(1024,)).double()
