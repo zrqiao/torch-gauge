@@ -238,7 +238,10 @@ class SphericalTensor:
         Fold the chucked representation channels of a 1-d SphericalTensor to a new dimension
         """
         assert len(self.rep_dims) == 1
-        assert torch.fmod(self.metadata, stride) == 0
+        assert torch.all(torch.fmod(self.metadata[0], stride) == 0), (
+            f"The number of channels for theSphericalTensor to be folded must be multiples of "
+            f"stride, got ({self.metadata}, {stride}) instead"
+        )
         new_ten = self.ten.unflatten(
             dim=self.rep_dims[0],
             sizes=(self.shape[self.rep_dims[0]] // stride, stride),

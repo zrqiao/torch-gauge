@@ -230,3 +230,24 @@ def test_spherical_tensor_invariant_contraction():
         atol=1e-4,
         rtol=0,
     )
+
+
+def test_spherical_tensor_fold_dim():
+    metadata = torch.LongTensor([[8, 4, 2, 4, 0]])
+    test = SphericalTensor(torch.rand(4, 6, 12, 58, 7), (3,), metadata)
+    folded = test.fold(stride=2)
+    assert folded.shape == (4, 6, 12, 29, 2, 7)
+    assert torch.all(folded.metadata[0].eq(torch.LongTensor([4, 2, 1, 2, 0])))
+    assert folded.num_channels == (9,)
+
+    # Test error capturing
+    metadata = torch.LongTensor([[8, 4, 2, 3, 1]])
+    test = SphericalTensor(torch.rand(4, 6, 12, 60, 7), (3,), metadata)
+    try:
+        test.fold(stride=2)
+    except AssertionError as e:
+        assert (
+            str(e)
+            == f"The number of channels for theSphericalTensor to be folded must be multiples of "
+            "stride, got (tensor([[8, 4, 2, 3, 1]]), 2) instead"
+        )
