@@ -284,7 +284,10 @@ class VerletList:
 
     @staticmethod
     def batch(vls: List["VerletList"]):
-        """WARNING: Taking batch of batches will break the offset indices"""
+        """
+        WARNING: In the current version, taking batch of batches will
+         break the offset indices
+        """
         batched_vl = VerletList()
         batched_vl.batch_num_nodes = torch.cat([vl.batch_num_nodes for vl in vls])
         batched_vl.n_nodes = torch.sum(batched_vl.batch_num_nodes)

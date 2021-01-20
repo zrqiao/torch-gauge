@@ -11,6 +11,7 @@ utilities are natively supported.
 ### From Source
 Once PyTorch is installed, running 
 
+    pip install versioneer && versioneer install
     pip install -e .
 
 ## Project Structure

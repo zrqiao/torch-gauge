@@ -79,12 +79,13 @@ class RepNorm(torch.nn.Module):
         gauge_ten: the "pure gauge" spherical tensor
     """
 
-    def __init__(self, dim, momentum=0.1, eps=1e-2):
+    def __init__(self, num_channels, momentum=0.1, eps=1e-2):
         super().__init__()
-        self._dim = dim
+        self._num_channels = num_channels
         self._eps = eps
-        self.batchnorm = torch.nn.BatchNorm1d(self._dim, momentum=momentum)
-        self.beta = torch.rand(self._dim)  # TODO: initialization schemes
+        self.batchnorm = torch.nn.BatchNorm1d(num_features=num_channels, momentum=momentum)
+        # TODO: initialization schemes
+        self.beta = torch.nn.Parameter(torch.rand(self._dim))
 
     def forward(self, x: SphericalTensor) -> (torch.Tensor, SphericalTensor):
         x0 = x.invariant()
