@@ -9,4 +9,6 @@ setup(
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     packages=find_packages(),
+    python_requires=">=3.7",
+    install_requires=['torch>=1.7.0'],
 )
