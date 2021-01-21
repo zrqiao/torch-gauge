@@ -279,6 +279,7 @@ class VerletList:
         self.ndata = {k: v.to(device) for k, v in self.ndata.items()}
         self.edata = {k: v.to(device) for k, v in self.edata.items()}
         self.edge_mask = self.edge_mask.to(device)
+        self._dst_edim_locators = self._dst_edim_locators.to(device)
         self.batch_num_nodes = self.batch_num_nodes.to(device)
         return self
 
@@ -289,6 +290,7 @@ class VerletList:
          break the offset indices
         """
         batched_vl = VerletList()
+        batched_vl.PADSIZE = vls[0].PADSIZE
         batched_vl.batch_num_nodes = torch.cat([vl.batch_num_nodes for vl in vls])
         batched_vl.n_nodes = torch.sum(batched_vl.batch_num_nodes)
         bnn_offsets = torch.repeat_interleave(
