@@ -10,16 +10,7 @@ import torch.nn.functional as F
 from torch.nn import Linear, Parameter
 
 from torch_gauge.verlet_list import VerletList
-
-
-class SSP(torch.nn.Softplus):
-    """Shifted SoftPlus activation"""
-
-    def __init__(self, beta=1, threshold=20):
-        super().__init__(beta, threshold)
-
-    def forward(self, input):
-        return F.softplus(input, self.beta, self.threshold) - math.sqrt(2)
+from torch_gauge.nn import SSP
 
 
 class SchNetLayer(torch.nn.Module):

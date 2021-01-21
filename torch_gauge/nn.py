@@ -3,6 +3,35 @@ import torch
 from torch_gauge.o3.spherical import SphericalTensor
 
 
+class SSP(torch.nn.Softplus):
+    """Shifted SoftPlus activation"""
+
+    def __init__(self, beta=1, threshold=20):
+        super().__init__(beta, threshold)
+
+    def forward(self, input):
+        return F.softplus(input, self.beta, self.threshold) - math.sqrt(2)
+
+
+class Swish_fn(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, i):
+        result = i * torch.sigmoid(i)
+        ctx.save_for_backward(i)
+        return result
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        i = ctx.saved_tensors[0]
+        sigmoid_i = torch.sigmoid(i)
+        return grad_output * (sigmoid_i * (1 + i * (1 - sigmoid_i)))
+
+
+class Swish(torch.nn.Module):
+    def forward(self, input_tensor):
+        return Swish_fn.apply(input_tensor)
+
+
 class IELin(torch.nn.Module):
     r"""
     Irrep-wise Equivariant Linear Layer
@@ -35,6 +64,7 @@ class IELin(torch.nn.Module):
 
     def __init__(self, metadata_in, metadata_out):
         super().__init__()
+        assert metadata_in.dim() == 1
         assert len(metadata_in) == len(metadata_out)
         self._metadata_in = metadata_in
         self._metadata_out = metadata_out
