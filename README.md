@@ -47,6 +47,7 @@ Once PyTorch is installed, running
     - `torch_gauge/o3` O(3) group algebra functionals
     - `torch_gauge/nn.py` Tensorial neural network building blocks
     - `torch_gauge/verlet_list.py` Verlet neighbor-list operations for representing relational data
+    - `torch_gauge/geometric.py` contains geometric operations on Euclidian data with autograd
     - `torch_gauge/models` contains exemplary implementations of GNN variants and descriptors 
     - `torch_gauge/tests` contains pytests
 - `src` contains C++/CUDA backend operations, under development
