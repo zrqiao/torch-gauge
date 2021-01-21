@@ -14,7 +14,7 @@ geometric learning models.
 
 As an illustration, check out our implementation of [SchNet](https://arxiv.org/abs/1706.08566) 's
  interaction module in just 15 lines of code:
-```
+```python
 class SchNetLayer(torch.nn.Module):
     def __init__(self, num_features):
         super().__init__()
