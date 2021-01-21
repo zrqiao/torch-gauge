@@ -54,8 +54,8 @@ class IELin(torch.nn.Module):
         )
         self._end_inds_in = torch.cumsum(self._metadata_in * n_irreps_per_l, dim=0)
         self._start_inds_in = torch.cat([torch.LongTensor([0]), self._end_inds_in[:-1]])
-        self.out_layout = SphericalTensor.generate_rep_layout_1d(self._metadata_out)
-        self.num_out_channels = torch.sum(self._metadata_out * n_irreps_per_l).item()
+        self.out_layout = SphericalTensor.generate_rep_layout_1d_(self._metadata_out)
+        self.num_out_channels = torch.sum(self._metadata_out).item()
 
     def forward(self, x: SphericalTensor) -> SphericalTensor:
         assert x.rep_dims[-1] == x.ten.dim() - 1

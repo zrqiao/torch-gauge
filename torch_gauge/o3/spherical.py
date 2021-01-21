@@ -264,6 +264,29 @@ class SphericalTensor:
                 num_channels=new_num_channels,
             )
 
+    def transpose_repdims(self, inplace=False):
+        assert len(self.rep_dims) == 2, "transpose_repdims only supports 2d SphericalTensor"
+        ten_t = torch.transpose(self.ten, *self.rep_dims).contiguous()
+        dims_t = self.rep_dims
+        metadata_t = self.metadata[(1, 0), :]
+        rep_layout_t = self.rep_layout[::-1]
+        num_channels_t = self.num_channels[::-1]
+        if inplace:
+            self.ten = ten_t
+            self.rep_dims = dims_t
+            self.metadata = metadata_t
+            self.rep_layout = rep_layout_t
+            self.num_channels = num_channels_t
+            return self
+        else:
+            return SphericalTensor(
+                ten_t,
+                rep_dims=dims_t,
+                metadata=metadata_t,
+                rep_layout=rep_layout_t,
+                num_channels=num_channels_t,
+            )
+
     def invariant(self) -> torch.Tensor:
         """
         Returns the invariant content
@@ -330,16 +353,16 @@ class SphericalTensor:
 
     def generate_rep_layout(self) -> Tuple[torch.LongTensor, ...]:
         if len(self.rep_dims) == 1:
-            return (self.generate_rep_layout_1d(self.metadata[0]),)
+            return (self.generate_rep_layout_1d_(self.metadata[0]),)
         elif len(self.rep_dims) == 2:
-            rep_layout_0 = self.generate_rep_layout_1d(self.metadata[0])
-            rep_layout_1 = self.generate_rep_layout_1d(self.metadata[1])
+            rep_layout_0 = self.generate_rep_layout_1d_(self.metadata[0])
+            rep_layout_1 = self.generate_rep_layout_1d_(self.metadata[1])
             return rep_layout_0, rep_layout_1
         else:
             raise NotImplementedError
 
     @staticmethod
-    def generate_rep_layout_1d(metadata1d) -> torch.LongTensor:
+    def generate_rep_layout_1d_(metadata1d) -> torch.LongTensor:
         n_irreps_per_l = torch.arange(start=0, end=metadata1d.size(0)) * 2 + 1
         end_channelids = torch.cumsum(metadata1d, dim=0)
         start_channelids = torch.cat([torch.LongTensor([0]), end_channelids[:-1]])

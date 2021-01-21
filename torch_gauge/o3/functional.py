@@ -78,7 +78,7 @@ class NormContraction2d(torch.autograd.Function):
         gathered_norm_shifted = torch.gather(norm_cache, dims[0], cache_inds)
         gathered_norm_shifted = gathered_norm_shifted.view(data_ten.shape)
         norm_grad = data_ten / gathered_norm_shifted
-        grad_input = gathered_grad_output * norm_grad
+        grad_input = gathered_grad_output.view_as(norm_grad) * norm_grad
         return grad_input, None, None, None, None
 
 
