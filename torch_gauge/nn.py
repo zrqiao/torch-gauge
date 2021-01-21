@@ -112,7 +112,7 @@ class RepNorm1d(torch.nn.Module):
             num_features=num_channels, momentum=momentum
         )
         # TODO: initialization schemes
-        self.beta = torch.nn.Parameter(torch.rand(self._dim))
+        self.beta = torch.nn.Parameter(torch.rand(self._num_channels))
 
     def forward(self, x: SphericalTensor) -> (torch.Tensor, SphericalTensor):
         x0 = x.invariant()

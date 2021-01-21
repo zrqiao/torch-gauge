@@ -265,7 +265,9 @@ class SphericalTensor:
             )
 
     def transpose_repdims(self, inplace=False):
-        assert len(self.rep_dims) == 2, "transpose_repdims only supports 2d SphericalTensor"
+        assert (
+            len(self.rep_dims) == 2
+        ), "transpose_repdims only supports 2d SphericalTensor"
         ten_t = torch.transpose(self.ten, *self.rep_dims).contiguous()
         dims_t = self.rep_dims
         metadata_t = self.metadata[(1, 0), :]
