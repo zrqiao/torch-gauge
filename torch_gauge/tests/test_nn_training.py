@@ -38,6 +38,7 @@ class mini2d(torch.nn.Module):
 
 
 def test_train_mini2d():
+    torch.manual_seed(42)
     metadata1d = torch.LongTensor([[12, 4, 8, 4, 4]])
     metadata2d = torch.LongTensor([[3, 1, 2, 1, 1], [3, 1, 2, 1, 1]])
     x_1d = SphericalTensor(torch.rand(1024, 128), (1,), metadata1d)
