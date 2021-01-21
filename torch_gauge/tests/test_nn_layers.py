@@ -141,7 +141,7 @@ def test_IELin_backward_2d():
         linear.weight.grad.data.zero_()
     out1 = ielin_dense(test_sp_ten)
     out2 = ielin_dense(out1.transpose_repdims(inplace=True))
-    pseudo_loss = out2.invariant().sum()
+    pseudo_loss = out2.invariant().sum() - 0.3
     grad_ten = torch.autograd.grad(
         outputs=pseudo_loss, inputs=test_sp_ten.ten, retain_graph=True
     )
@@ -183,7 +183,7 @@ def test_RepNorm1d_backward():
     n, g = repnorm(test_sp_batched)
     out = gauge_linear(g).scalar_mul(activation(norm_linear(n)), inplace=True)
 
-    pseudo_loss = out.invariant().pow(2).sum()
+    pseudo_loss = out.invariant().pow(2).sum() - 0.3
     pseudo_loss.backward()
     assert torch.all(test_sp_batched.ten.grad.abs().bool())
     assert torch.all(norm_linear.weight.grad.abs().bool())
