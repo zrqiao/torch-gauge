@@ -15,6 +15,7 @@ geometric learning models.
 As an illustration, check out our implementation of [SchNet](https://arxiv.org/abs/1706.08566) 's
  interaction module in just 20 lines of code:
 ```python
+import torch
 from torch.nn import Linear, Parameter
 from torch_gauge.verlet_list import VerletList
 from torch_gauge.nn import SSP
@@ -55,7 +56,7 @@ Once PyTorch is installed, running
     - `torch_gauge/o3` O(3) group algebra functionals
     - `torch_gauge/nn.py` Tensorial neural network building blocks
     - `torch_gauge/verlet_list.py` Verlet neighbor-list operations for representing relational data
-    - `torch_gauge/geometric.py` contains geometric operations on Euclidian data with autograd
+    - `torch_gauge/geometric.py` contains geometric and algebra operations with autograd
     - `torch_gauge/models` contains exemplary implementations of GNN variants and descriptors 
     - `torch_gauge/tests` contains pytests
 - `src` contains C++/CUDA backend operations (under development)

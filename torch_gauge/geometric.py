@@ -47,3 +47,33 @@ def univec_angle_unsafe(vec1: torch.Tensor, vec2: torch.Tensor):
 def univec_cos(vec1: torch.Tensor, vec2: torch.Tensor):
     """Returns cos(\theta) for angular embeddings"""
     return vec1.mul(vec2).sum(-1)
+
+
+class Chebyshev(nn.Module):
+    """Generating Chebshev polynomials from powers"""
+
+    def __init__(self, order):
+        super(Chebyshev, self).__init__()
+        self.order = order
+        self.orders = torch.arange(order + 1, dtype=torch.long)
+        self.orders = nn.Parameter(self.orders, requires_grad=False)
+        self._init_coefficients()
+
+    def _init_coefficients(self):
+        """
+        Generating combination coefficients using recursion
+        Starting from order 1
+        """
+        coeff = torch.zeros(self.order + 1, self.order + 1)
+        coeff[0, 0] = 1
+        coeff[1, 1] = 1
+        for idx in range(2, self.order + 1):
+            coeff[1:, idx] = 2 * coeff[:-1, idx - 1]
+            coeff[:, idx] -= coeff[:, idx - 2]
+        self.cheb_coeff = nn.Parameter(coeff[:, 1:], requires_grad=False)
+
+    def forward(self, x):
+        size = (*x.shape, self.order + 1)
+        x = x.unsqueeze(-1).expand(size).pow(self.orders)
+        out = torch.matmul(x, self.cheb_coeff)
+        return out

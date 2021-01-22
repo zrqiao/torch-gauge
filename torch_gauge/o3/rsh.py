@@ -1,6 +1,6 @@
 """
-Real Solid Harmonics and Spherical Harmonics
-The evalulation scheme and ordering of representations follows:
+Real Solid Harmonics and Spherical Harmonics (Ket state)
+The evalulation scheme, convention and ordering of representations follows:
  Helgaker, Trygve, Poul Jorgensen, and Jeppe Olsen. Molecular electronic-structure theory.
  John Wiley & Sons, 2014. Page 215, Eq. 6.4.47
 """
