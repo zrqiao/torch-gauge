@@ -3,9 +3,9 @@
 A light-weight [PyTorch](https://pytorch.org/) extension for efficient gauge-equivariant learning.
 
 ## About
-Torch-Gauge is a library to boost geometric learning on physical data structures
-with Lie-group symmetry and beyond two-body interactions. The library is designed to be optimized for 
-training/inference on GPUs, with mini-batch training utilities natively supported.
+**Torch-Gauge** is a library to boost geometric learning on physical data structures
+with Lie-group symmetry and beyond two-body interactions. The library is designed to be specially optimized
+for training and inference on GPUs, with mini-batch training utilities natively supported.
 
 ## Usage
 Torch-Gauge uses padded [Verlet list](https://en.wikipedia.org/wiki/Verlet_list) as the core for 
@@ -58,7 +58,7 @@ Once PyTorch is installed, running
     - `torch_gauge/geometric.py` contains geometric operations on Euclidian data with autograd
     - `torch_gauge/models` contains exemplary implementations of GNN variants and descriptors 
     - `torch_gauge/tests` contains pytests
-- `src` contains C++/CUDA backend operations, under development
+- `src` contains C++/CUDA backend operations (under development)
     
 ## Test
 
