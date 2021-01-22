@@ -46,10 +46,10 @@ def test_train_mini2d():
     torch.manual_seed(42)
     metadata1d = torch.LongTensor([[12, 4, 8, 4, 4]])
     metadata2d = torch.LongTensor([[3, 1, 2, 1, 1], [3, 1, 2, 1, 1]])
-    x_1d = SphericalTensor(torch.rand(1024, 128), (1,), metadata1d)
-    x_2d = SphericalTensor(torch.rand(1024, 32, 32, 4), (1, 2), metadata2d)
+    x_1d = SphericalTensor(torch.rand(128, 128), (1,), metadata1d)
+    x_2d = SphericalTensor(torch.rand(128, 32, 32, 4), (1, 2), metadata2d)
     # Create synthetic labels
-    rs_1d = x_1d.ten.view(1024, 32, 4)
+    rs_1d = x_1d.ten.view(128, 32, 4)
     labels = torch.sin(
         (x_2d.ten * rs_1d.unsqueeze(1) * rs_1d.unsqueeze(2))
         .pow(2)
@@ -67,12 +67,12 @@ def test_train_mini2d():
 
     loss_fn = torch.nn.MSELoss()
     mae_fn = torch.nn.L1Loss()
-    optimizer = torch.optim.Adam(mods.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(mods.parameters(), lr=1e-3)
 
-    for epoch in range(25):
+    for epoch in range(50):
         epoch_mae = 0.0
-        for iter in range(32):
-            batch_idx = torch.randint(1024, (32,))
+        for iter in range(4):
+            batch_idx = torch.randint(128, (32,))
             batch_label = labels[batch_idx]
             x_1d_new = x_1d.self_like(x_1d.ten[batch_idx])
             x_2d_new = x_2d.self_like(x_2d.ten[batch_idx])

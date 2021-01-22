@@ -3,10 +3,12 @@ Testing real spherical harmonics generation
 """
 
 import math
+import random
 
 import torch
 
 from torch_gauge.o3.rsh import RSHxyz
+from torch_gauge.o3.wigner import wigner_D_rsh
 
 
 def test_batch_rsh_generation():
@@ -71,3 +73,22 @@ def test_rsh_batch_explicit():
         atol=1e-8,
         rtol=0,
     )
+
+
+def test_wigner_rsh_z():
+    for _ in range(10):
+        alpha = random.random() * 2 * math.pi
+        rsh_wigner_1 = wigner_D_rsh(1, alpha, 0, 0)
+        ref_rotmat = torch.tensor(
+            [
+                [math.cos(alpha), 0, -math.sin(alpha)],
+                [0, 1, 0],
+                [math.sin(alpha), 0, math.cos(alpha)],
+            ],
+            dtype=torch.double,
+        ).t()
+        assert torch.allclose(rsh_wigner_1, ref_rotmat, atol=1e-7, rtol=1e-5,), print(
+            "Wigner-D at j=1 does not match the Cartesian rotation matrix: ",
+            rsh_wigner_1,
+            ref_rotmat,
+        )

@@ -26,7 +26,10 @@ def _wigner_small_d_coeff(j, m1, m, k):
         * factorial(j - k - m1)
         * factorial(k - m + m1)
     )
-    return sgn * numer * denom
+    if denom == 0:
+        return None
+    else:
+        return sgn * numer / denom
 
 
 def wigner_small_d_csh(j, beta):
@@ -38,10 +41,12 @@ def wigner_small_d_csh(j, beta):
             kmax = max(0, j + m, j - m1)
             d_m1_m = 0
             for k in range(kmin, kmax + 1):
-                angular = (math.cos(beta / 2)) ** (2 * j - 2 * k + m - m1) * (
-                    math.sin(beta / 2)
-                ) ** (2 * j - m + m1)
-                d_m1_m += _wigner_small_d_coeff(j, m1, m, k) * angular
+                prefactor = _wigner_small_d_coeff(j, m1, m, k)
+                if prefactor is not None:
+                    angular = (math.cos(beta / 2)) ** (2 * j - 2 * k + m - m1) * (
+                        math.sin(beta / 2)
+                    ) ** (2 * k - m + m1)
+                    d_m1_m += prefactor * angular
             small_d[m1 + j, m + j] = d_m1_m
     return small_d
 
@@ -61,16 +66,16 @@ def wigner_D_csh(j, alpha, beta, gamma):
 
 @memory.cache
 def csh_to_rsh(j):
-    transform_mat = torch.zeros(2*j+1, 2*j+1, dtype=torch.cdouble)
+    transform_mat = torch.zeros(2 * j + 1, 2 * j + 1, dtype=torch.cdouble)
     for m in range(-j, j + 1):
         if m < 0:
-            transform_mat[m, m] = 1j / math.sqrt(2)
-            transform_mat[-m, m] = -(-1)**m * 1j / math.sqrt(2)
+            transform_mat[j + m, j + m] = 1j / math.sqrt(2)
+            transform_mat[j - m, j + m] = -((-1) ** m) * 1j / math.sqrt(2)
         elif m == 0:
-            transform_mat[m, m] = 0
+            transform_mat[j + m, j + m] = 1
         elif m > 0:
-            transform_mat[-m, m] = 1 / math.sqrt(2)
-            transform_mat[m, m] = (-1)**m / math.sqrt(2)
+            transform_mat[j - m, j + m] = 1 / math.sqrt(2)
+            transform_mat[j + m, j + m] = (-1) ** m / math.sqrt(2)
         else:
             raise ValueError
     return transform_mat
@@ -79,7 +84,9 @@ def csh_to_rsh(j):
 def wigner_D_rsh(j, alpha, beta, gamma):
     c2r = csh_to_rsh(j)
     wigner_csh = wigner_D_csh(j, alpha, beta, gamma)
-    wigner_rsh = c2r.mm(wigner_csh).mm(c2r.conj().t())
+    wigner_rsh = (c2r.conj().t()).mm(wigner_csh).mm(c2r)
     # Checking the RSH rotation matrix entries are all real
-    assert torch.allclose(wigner_rsh.imag, torch.zeros(2*j+1, 2*j+1))
+    assert torch.allclose(
+        wigner_rsh.imag, torch.zeros(2 * j + 1, 2 * j + 1, dtype=torch.double)
+    ), print(c2r, wigner_csh, wigner_rsh)
     return wigner_rsh.real
