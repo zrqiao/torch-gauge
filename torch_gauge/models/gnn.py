@@ -27,7 +27,7 @@ class SchNetLayer(torch.nn.Module):
         self.cfconv = torch.nn.Sequential(
             Linear(300, _nf), SSP(), Linear(_nf, _nf), SSP()
         )
-        self.pre_conv = Linear(self._nf, self._nf)
+        self.pre_conv = Linear(_nf, _nf)
         self.post_conv = torch.nn.Sequential(Linear(_nf, _nf), SSP(), Linear(_nf, _nf))
 
     def forward(self, vl: VerletList, l: int):
