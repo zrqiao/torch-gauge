@@ -45,6 +45,10 @@ And that's it.
 
 ## Setups
 
+### From pip
+
+    pip install torch-gauge
+
 ### From Source
 Once PyTorch is installed, running 
 
