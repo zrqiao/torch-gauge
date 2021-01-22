@@ -14,7 +14,7 @@ import torch
 from scipy.special import factorial
 
 
-@memory.cache()
+@memory.cache
 def _wigner_small_d_coeff(j, m1, m, k):
     sgn = (-1) ** (k - m + m1)
     numer = math.sqrt(
@@ -42,15 +42,44 @@ def wigner_small_d_csh(j, beta):
                     math.sin(beta / 2)
                 ) ** (2 * j - m + m1)
                 d_m1_m += _wigner_small_d_coeff(j, m1, m, k) * angular
-            small_d[m1+j, m+j] = d_m1_m
+            small_d[m1 + j, m + j] = d_m1_m
     return small_d
 
 
 def wigner_D_csh(j, alpha, beta, gamma):
-    """Euler rotation for complex spherical harmonics"""
-    ms = torch.arange(-j, j+1)
+    """
+    Euler rotation for complex spherical harmonics
+    Contra-variant convention, for right multiplication
+    """
+    ms = torch.arange(-j, j + 1)
     small_d = wigner_small_d_csh(j, beta).to(torch.cdouble)
     alpha_phases = torch.exp(-1j * ms * alpha)
     gamma_phases = torch.exp(-1j * ms * gamma)
     wigner_D = alpha_phases.unsqueeze(1) * small_d * gamma_phases.unsqueeze(0)
     return wigner_D
+
+
+@memory.cache
+def csh_to_rsh(j):
+    transform_mat = torch.zeros(2*j+1, 2*j+1, dtype=torch.cdouble)
+    for m in range(-j, j + 1):
+        if m < 0:
+            transform_mat[m, m] = 1j / math.sqrt(2)
+            transform_mat[-m, m] = -(-1)**m * 1j / math.sqrt(2)
+        elif m == 0:
+            transform_mat[m, m] = 0
+        elif m > 0:
+            transform_mat[-m, m] = 1 / math.sqrt(2)
+            transform_mat[m, m] = (-1)**m / math.sqrt(2)
+        else:
+            raise ValueError
+    return transform_mat
+
+
+def wigner_D_rsh(j, alpha, beta, gamma):
+    c2r = csh_to_rsh(j)
+    wigner_csh = wigner_D_csh(j, alpha, beta, gamma)
+    wigner_rsh = c2r.mm(wigner_csh).mm(c2r.conj().t())
+    # Checking the RSH rotation matrix entries are all real
+    assert torch.allclose(wigner_rsh.imag, torch.zeros(2*j+1, 2*j+1))
+    return wigner_rsh.real
