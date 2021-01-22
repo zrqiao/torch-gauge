@@ -66,6 +66,16 @@ class SphericalTensor:
     def shape(self):
         return self.ten.shape
 
+    def self_like(self, new_data_ten):
+        """Returns a SphericalTensor with identical layout but new data tensor"""
+        return SphericalTensor(
+            new_data_ten,
+            rep_dims=self.rep_dims,
+            metadata=self.metadata,
+            rep_layout=self.rep_layout,
+            num_channels=self.num_channels,
+        )
+
     def mul_(self, other: "SphericalTensor"):
         # Be careful that this operation will break equivariance
         self.ten.mul_(other.ten)
@@ -76,22 +86,10 @@ class SphericalTensor:
         return self.ten
 
     def __mul__(self, other: "SphericalTensor"):
-        return SphericalTensor(
-            self.ten * other.ten,
-            rep_dims=self.rep_dims,
-            metadata=self.metadata,
-            rep_layout=self.rep_layout,
-            num_channels=self.num_channels,
-        )
+        return self.self_like(self.ten * other.ten)
 
     def __add__(self, other: "SphericalTensor"):
-        return SphericalTensor(
-            self.ten + other.ten,
-            rep_dims=self.rep_dims,
-            metadata=self.metadata,
-            rep_layout=self.rep_layout,
-            num_channels=self.num_channels,
-        )
+        return self.self_like(self.ten + other.ten)
 
     def scalar_mul(self, other: torch.Tensor, inplace=False):
         """
@@ -126,13 +124,7 @@ class SphericalTensor:
             self.ten.mul_(broadcasted_other)
             return self
         else:
-            return SphericalTensor(
-                self.ten * broadcasted_other,
-                rep_dims=self.rep_dims,
-                metadata=self.metadata,
-                rep_layout=self.rep_layout,
-                num_channels=self.num_channels,
-            )
+            return self.self_like(self.ten * broadcasted_other)
 
     def dot(self, other: "SphericalTensor", dim: int):
         """

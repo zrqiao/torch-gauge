@@ -37,10 +37,8 @@ class mini2d(torch.nn.Module):
             .sum(dim=1)
         )
         a = self.twobody_gate(a)
-        new_2d_ten = self.twobody_linear(x_2d.ten).mul(a.unsqueeze(1).unsqueeze(2))
-        x_2d_new = SphericalTensor(
-            new_2d_ten, x_2d.rep_dims, x_2d.metadata, x_2d.rep_layout, x_2d.num_channels
-        )
+        new_2d_ten = (self.twobody_linear(x_2d.ten)).mul(a.unsqueeze(1).unsqueeze(2))
+        x_2d_new = x_2d.self_like(new_2d_ten)
         return x_1d_new, x_2d_new
 
 
@@ -68,36 +66,29 @@ def test_train_mini2d():
     )
 
     loss_fn = torch.nn.MSELoss()
+    mae_fn = torch.nn.L1Loss()
     optimizer = torch.optim.Adam(mods.parameters(), lr=1e-4)
 
-    for epoch in range(50):
+    for epoch in range(25):
+        epoch_mae = 0.0
         for iter in range(32):
             batch_idx = torch.randint(1024, (32,))
             batch_label = labels[batch_idx]
-            x_1d_new = SphericalTensor(
-                x_1d.ten[batch_idx],
-                x_1d.rep_dims,
-                x_1d.metadata,
-                x_1d.rep_layout,
-                x_1d.num_channels,
-            )
-            x_2d_new = SphericalTensor(
-                x_2d.ten[batch_idx],
-                x_2d.rep_dims,
-                x_2d.metadata,
-                x_2d.rep_layout,
-                x_2d.num_channels,
-            )
+            x_1d_new = x_1d.self_like(x_1d.ten[batch_idx])
+            x_2d_new = x_2d.self_like(x_2d.ten[batch_idx])
             for mod in mods:
                 x_1d_new, x_2d_new = mod(x_1d_new, x_2d_new)
             out = x_2d_new.invariant().sum(dim=(1, 2, 3))
             optimizer.zero_grad()
             loss = loss_fn(out, batch_label)
+            mae = mae_fn(out, batch_label)
             loss.backward()
             optimizer.step()
-        print(f"Epoch: {epoch+1}, Loss: {loss}")
+            epoch_mae += mae.item()
+        print(f"Epoch: {epoch+1}, Loss: {loss}, MAE: {epoch_mae/32}")
 
     assert loss < 0.01
+    assert mae < 0.1
 
 
 if __name__ == "__main__":
