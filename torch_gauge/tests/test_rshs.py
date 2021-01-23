@@ -150,13 +150,13 @@ def test_wigner_rsh_y():
 
 def test_wigner_rsh_zyz():
     # Test Euler rotation
-    # Note that space-fixed rotation (alpha, beta, gamma) == Euler rotation (gamma, beta, alpha),
+    # Note that space-fixed rotation (gamma, beta, alpha) == Euler rotation (alpha, beta, gamma),
     # as elaborated in Sec. 3.3, Page 175-177 of J. J. Sakurai
     for _ in range(10):
         alpha = random.random() * 2 * math.pi
         beta = random.random() * 2 * math.pi
         gamma = random.random() * 2 * math.pi
-        rsh_wigner_1 = wigner_D_rsh(1, gamma, beta, alpha)
+        rsh_wigner_1 = wigner_D_rsh(1, alpha, beta, gamma)
         ref1 = torch.tensor(
             [
                 [math.cos(alpha), 0, -math.sin(alpha)],
@@ -181,7 +181,7 @@ def test_wigner_rsh_zyz():
             ],
             dtype=torch.double,
         )
-        ref_rotmat = ref1.mm(ref2).mm(ref3)
+        ref_rotmat = ref3.mm(ref2).mm(ref1)
         assert torch.allclose(rsh_wigner_1, ref_rotmat, atol=1e-6, rtol=1e-5,), print(
             "Wigner-D at j=1 does not match the Cartesian rotation matrix: ",
             rsh_wigner_1,
@@ -201,7 +201,7 @@ def test_wigner_rsh_rotation():
     ref1 = rotation_matrix_xyz(alpha, "z", dtype=torch.double).t()
     ref2 = rotation_matrix_xyz(beta, "y", dtype=torch.double).t()
     ref3 = rotation_matrix_xyz(gamma, "z", dtype=torch.double).t()
-    ref_rot = ref1.mm(ref2).mm(ref3)
+    ref_rot = ref3.mm(ref2).mm(ref1)
     rot_xyz = xyz.mm(ref_rot)
 
     rsh_pre = rshmodule(xyz).ten
@@ -209,7 +209,7 @@ def test_wigner_rsh_rotation():
 
     wigner_rot_rshs = []
     for l in range(11):
-        real_wigner_l = wigner_D_rsh(l, gamma, beta, alpha)
+        real_wigner_l = wigner_D_rsh(l, alpha, beta, gamma)
         wigner_rot_rshs.append(rsh_pre[:, l ** 2 : (l + 1) ** 2].mm(real_wigner_l))
 
     wigner_rot_rshs = torch.cat(wigner_rot_rshs, dim=1)
