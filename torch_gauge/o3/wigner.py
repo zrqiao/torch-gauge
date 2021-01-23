@@ -61,6 +61,7 @@ def wigner_D_csh(j, alpha, beta, gamma):
     alpha_phases = torch.exp(-1j * ms * alpha)
     gamma_phases = torch.exp(-1j * ms * gamma)
     wigner_D = alpha_phases.unsqueeze(1) * small_d * gamma_phases.unsqueeze(0)
+    assert torch.allclose(wigner_D.mm(wigner_D.t().conj()), torch.eye(2*j+1, 2*j+1, dtype=torch.cdouble), atol=1e-7)
     return wigner_D
 
 
@@ -68,6 +69,7 @@ def wigner_D_csh(j, alpha, beta, gamma):
 def csh_to_rsh(j):
     transform_mat = torch.zeros(2 * j + 1, 2 * j + 1, dtype=torch.cdouble)
     for m in range(-j, j + 1):
+        # Enumerate by out m
         if m < 0:
             transform_mat[j + m, j + m] = 1j / math.sqrt(2)
             transform_mat[j - m, j + m] = -((-1) ** m) * 1j / math.sqrt(2)
@@ -83,7 +85,8 @@ def csh_to_rsh(j):
 
 def wigner_D_rsh(j, alpha, beta, gamma):
     c2r = csh_to_rsh(j)
-    wigner_csh = wigner_D_csh(j, alpha, beta, gamma)
+    # Why the angles need to be reversed here? TODO: check any definition mismatch
+    wigner_csh = wigner_D_csh(j, -alpha, -beta, -gamma)
     wigner_rsh = (c2r.conj().t()).mm(wigner_csh).mm(c2r)
     # Checking the RSH rotation matrix entries are all real
     assert torch.allclose(
