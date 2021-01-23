@@ -6,15 +6,19 @@ The evalulation scheme, convention and ordering of representations follows:
 """
 
 import torch
+from joblib import Memory
 from scipy.special import binom, factorial
 
 from torch_gauge.o3.spherical import SphericalTensor
+
+memory = Memory(".o3_cache", verbose=0)
 
 
 def vm(m):
     return (1 / 2) * (m < 0).long()
 
 
+@memory.cache
 def get_c_lmtuv(l, m, t, u, v):
 
     c = (
@@ -29,6 +33,7 @@ def get_c_lmtuv(l, m, t, u, v):
     return c
 
 
+@memory.cache
 def get_ns_lm(l, m):
     return (1 / (2 ** torch.abs(m) * factorial(l))) * torch.sqrt(
         2
