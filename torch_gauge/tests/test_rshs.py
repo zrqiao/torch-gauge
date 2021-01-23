@@ -7,6 +7,7 @@ import random
 
 import torch
 
+from torch_gauge.geometric import rotation_matrix_xyz
 from torch_gauge.o3.rsh import RSHxyz
 from torch_gauge.o3.wigner import wigner_D_rsh, wigner_small_d_csh
 
@@ -80,11 +81,23 @@ def test_wigner_small_d():
     theta = random.random() * 2 * math.pi
     ref_mat = torch.tensor(
         [
-            [1/2*(1+math.cos(theta)), 1/math.sqrt(2)*math.sin(theta), 1/2*(1-math.cos(theta))],
-            [-1/math.sqrt(2)*math.sin(theta), math.cos(theta), 1/math.sqrt(2)*math.sin(theta)],
-            [1/2*(1-math.cos(theta)), -1/math.sqrt(2)*math.sin(theta), 1/2*(1+math.cos(theta))],
+            [
+                1 / 2 * (1 + math.cos(theta)),
+                1 / math.sqrt(2) * math.sin(theta),
+                1 / 2 * (1 - math.cos(theta)),
+            ],
+            [
+                -1 / math.sqrt(2) * math.sin(theta),
+                math.cos(theta),
+                1 / math.sqrt(2) * math.sin(theta),
+            ],
+            [
+                1 / 2 * (1 - math.cos(theta)),
+                -1 / math.sqrt(2) * math.sin(theta),
+                1 / 2 * (1 + math.cos(theta)),
+            ],
         ],
-        dtype=torch.double
+        dtype=torch.double,
     )
     assert torch.allclose(
         wigner_small_d_csh(1, theta),
@@ -183,30 +196,9 @@ def test_wigner_rsh_rotation():
     alpha = random.random() * 2 * math.pi
     beta = random.random() * 2 * math.pi
     gamma = random.random() * 2 * math.pi
-    ref1 = torch.tensor(
-        [
-            [math.cos(alpha), -math.sin(alpha), 0],
-            [math.sin(alpha), math.cos(alpha), 0],
-            [0, 0, 1],
-        ],
-        dtype=torch.double,
-    ).t()
-    ref2 = torch.tensor(
-        [
-            [math.cos(beta), 0, math.sin(beta)],
-            [0, 1, 0],
-            [-math.sin(beta), 0, math.cos(beta)],
-        ],
-        dtype=torch.double,
-    ).t()
-    ref3 = torch.tensor(
-        [
-            [math.cos(gamma), -math.sin(gamma), 0],
-            [math.sin(gamma), math.cos(gamma), 0],
-            [0, 0, 1],
-        ],
-        dtype=torch.double,
-    ).t()
+    ref1 = rotation_matrix_xyz(alpha, "z", dtype=torch.double).t()
+    ref2 = rotation_matrix_xyz(beta, "y", dtype=torch.double).t()
+    ref3 = rotation_matrix_xyz(gamma, "z", dtype=torch.double).t()
     ref_rot = ref1.mm(ref2).mm(ref3)
     rot_xyz = xyz.mm(ref_rot)
 
@@ -216,7 +208,9 @@ def test_wigner_rsh_rotation():
     wigner_rot_rshs = []
     for l in range(11):
         real_wigner_l = wigner_D_rsh(l, alpha, beta, gamma)
-        wigner_rot_rshs.append(rsh_pre[:, l**2:(l+1)**2].mm(real_wigner_l))
+        wigner_rot_rshs.append(rsh_pre[:, l ** 2 : (l + 1) ** 2].mm(real_wigner_l))
 
     wigner_rot_rshs = torch.cat(wigner_rot_rshs, dim=1)
-    assert torch.allclose(rsh_rot, wigner_rot_rshs, atol=1e-6), print(rsh_rot, wigner_rot_rshs)
+    assert torch.allclose(rsh_rot, wigner_rot_rshs, atol=1e-6), print(
+        rsh_rot, wigner_rot_rshs
+    )

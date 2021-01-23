@@ -7,11 +7,11 @@ Evaluation and symbolic convention follows:
 
 import math
 
+import torch
 from joblib import Memory
+from scipy.special import factorial
 
 memory = Memory(".o3_cache", verbose=0)
-import torch
-from scipy.special import factorial
 
 
 @memory.cache
@@ -61,7 +61,11 @@ def wigner_D_csh(j, alpha, beta, gamma):
     alpha_phases = torch.exp(-1j * ms * alpha)
     gamma_phases = torch.exp(-1j * ms * gamma)
     wigner_D = alpha_phases.unsqueeze(1) * small_d * gamma_phases.unsqueeze(0)
-    assert torch.allclose(wigner_D.mm(wigner_D.t().conj()), torch.eye(2*j+1, 2*j+1, dtype=torch.cdouble), atol=1e-7)
+    assert torch.allclose(
+        wigner_D.mm(wigner_D.t().conj()),
+        torch.eye(2 * j + 1, 2 * j + 1, dtype=torch.cdouble),
+        atol=1e-7,
+    )
     return wigner_D
 
 

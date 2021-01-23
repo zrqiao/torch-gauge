@@ -1,6 +1,8 @@
 """
 Geometric operations on point-clouds and manifolds
 """
+import math
+
 import torch
 
 
@@ -49,14 +51,50 @@ def univec_cos(vec1: torch.Tensor, vec2: torch.Tensor):
     return vec1.mul(vec2).sum(-1)
 
 
-class Chebyshev(nn.Module):
+def rotation_matrix_xyz(phi, axis, dtype=torch.double):
+    """
+    Rotation matrix for the intrinsic rotation about the specified axis,
+     with the column-xyz (left-multiplication) convention
+    """
+    if axis == "z":
+        return torch.tensor(
+            [
+                [math.cos(phi), -math.sin(phi), 0],
+                [math.sin(phi), math.cos(phi), 0],
+                [0, 0, 1],
+            ],
+            dtype=dtype,
+        )
+    elif axis == "y":
+        return torch.tensor(
+            [
+                [math.cos(phi), 0, math.sin(phi)],
+                [0, 1, 0],
+                [-math.sin(phi), 0, math.cos(phi)],
+            ],
+            dtype=dtype,
+        )
+    elif axis == "x":
+        return torch.tensor(
+            [
+                [1, 0, 0],
+                [0, math.cos(phi), -math.sin(phi)],
+                [0, math.sin(phi), math.cos(phi)],
+            ],
+            dtype=dtype,
+        )
+    else:
+        raise ValueError(f"Invalid axis: {axis}")
+
+
+class Chebyshev(torch.nn.Module):
     """Generating Chebshev polynomials from powers"""
 
     def __init__(self, order):
         super(Chebyshev, self).__init__()
         self.order = order
         self.orders = torch.arange(order + 1, dtype=torch.long)
-        self.orders = nn.Parameter(self.orders, requires_grad=False)
+        self.orders = torch.nn.Parameter(self.orders, requires_grad=False)
         self._init_coefficients()
 
     def _init_coefficients(self):
@@ -70,7 +108,7 @@ class Chebyshev(nn.Module):
         for idx in range(2, self.order + 1):
             coeff[1:, idx] = 2 * coeff[:-1, idx - 1]
             coeff[:, idx] -= coeff[:, idx - 2]
-        self.cheb_coeff = nn.Parameter(coeff[:, 1:], requires_grad=False)
+        self.cheb_coeff = torch.nn.Parameter(coeff[:, 1:], requires_grad=False)
 
     def forward(self, x):
         size = (*x.shape, self.order + 1)
