@@ -89,11 +89,19 @@ def csh_to_rsh(j):
 
 def wigner_D_rsh(j, alpha, beta, gamma):
     c2r = csh_to_rsh(j)
-    # Why the angles need to be reversed here? TODO: check any definition mismatch
-    wigner_csh = wigner_D_csh(j, -alpha, -beta, -gamma)
-    wigner_rsh = (c2r.conj().t()).mm(wigner_csh).mm(c2r)
+    wigner_csh = wigner_D_csh(j, alpha, beta, gamma)
+    wigner_rsh = (c2r.conj().t()).mm(wigner_csh.t().conj()).mm(c2r)
     # Checking the RSH rotation matrix entries are all real
     assert torch.allclose(
         wigner_rsh.imag, torch.zeros(2 * j + 1, 2 * j + 1, dtype=torch.double)
     ), print(c2r, wigner_csh, wigner_rsh)
     return wigner_rsh.real
+
+
+if __name__ == "__main__":
+    import random
+    alpha = random.random() * 2 * math.pi
+    beta = random.random() * 2 * math.pi
+    gamma = random.random() * 2 * math.pi
+    print(wigner_D_csh(1, alpha, beta, gamma))
+    print(wigner_D_csh(1, -alpha, -beta, -gamma))

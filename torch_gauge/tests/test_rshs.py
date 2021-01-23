@@ -150,11 +150,13 @@ def test_wigner_rsh_y():
 
 def test_wigner_rsh_zyz():
     # Test Euler rotation
+    # Note that space-fixed rotation (alpha, beta, gamma) == Euler rotation (gamma, beta, alpha),
+    # as elaborated in Dec. 3.3 of J. J. Sakurai
     for _ in range(10):
         alpha = random.random() * 2 * math.pi
         beta = random.random() * 2 * math.pi
         gamma = random.random() * 2 * math.pi
-        rsh_wigner_1 = wigner_D_rsh(1, alpha, beta, gamma)
+        rsh_wigner_1 = wigner_D_rsh(1, gamma, beta, alpha)
         ref1 = torch.tensor(
             [
                 [math.cos(alpha), 0, -math.sin(alpha)],
@@ -207,7 +209,7 @@ def test_wigner_rsh_rotation():
 
     wigner_rot_rshs = []
     for l in range(11):
-        real_wigner_l = wigner_D_rsh(l, alpha, beta, gamma)
+        real_wigner_l = wigner_D_rsh(l, gamma, beta, alpha)
         wigner_rot_rshs.append(rsh_pre[:, l ** 2 : (l + 1) ** 2].mm(real_wigner_l))
 
     wigner_rot_rshs = torch.cat(wigner_rot_rshs, dim=1)
