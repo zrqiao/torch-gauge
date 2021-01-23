@@ -151,7 +151,7 @@ def test_wigner_rsh_y():
 def test_wigner_rsh_zyz():
     # Test Euler rotation
     # Note that space-fixed rotation (alpha, beta, gamma) == Euler rotation (gamma, beta, alpha),
-    # as elaborated in Dec. 3.3 of J. J. Sakurai
+    # as elaborated in Sec. 3.3, Page 175-177 of J. J. Sakurai
     for _ in range(10):
         alpha = random.random() * 2 * math.pi
         beta = random.random() * 2 * math.pi
