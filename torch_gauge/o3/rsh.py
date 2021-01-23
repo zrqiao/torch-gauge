@@ -5,13 +5,16 @@ The evalulation scheme, convention and ordering of representations follows:
  John Wiley & Sons, 2014. Page 215, Eq. 6.4.47
 """
 
+import os
+
 import torch
 from joblib import Memory
 from scipy.special import binom, factorial
 
+from torch_gauge import ROOT_DIR
 from torch_gauge.o3.spherical import SphericalTensor
 
-memory = Memory(".o3_cache", verbose=0)
+memory = Memory(os.path.join(ROOT_DIR, ".o3_cache"), verbose=0)
 
 
 def vm(m):

@@ -6,12 +6,15 @@ Evaluation and symbolic convention follows:
 """
 
 import math
+import os
 
 import torch
 from joblib import Memory
 from scipy.special import factorial
 
-memory = Memory(".o3_cache", verbose=0)
+from torch_gauge import ROOT_DIR
+
+memory = Memory(os.path.join(ROOT_DIR, ".o3_cache"), verbose=0)
 
 
 @memory.cache
