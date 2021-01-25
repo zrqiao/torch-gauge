@@ -115,3 +115,14 @@ class Chebyshev(torch.nn.Module):
         x = x.unsqueeze(-1).expand(size).pow(self.orders)
         out = torch.matmul(x, self.cheb_coeff)
         return out
+
+
+def poly_env(d, p=6):
+    """A polynomial wrapper defined in J. Klicpera, J. Groß,
+    and S. G¨unnemann, arXiv preprint arXiv:2003.03123 (2020)"""
+    return (
+        1
+        - (p + 1) * (p + 2) // 2 * d ** p
+        + p * (p + 2) * d ** (p + 1)
+        - p * (p + 1) // 2 * d ** (p + 2)
+    )
