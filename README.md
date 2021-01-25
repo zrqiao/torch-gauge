@@ -26,7 +26,9 @@ class SchNetLayer(torch.nn.Module):
     _nf = num_features
     self.gamma = 10.0
     self.rbf_centers = Parameter(torch.linspace(0.1, 30.1, 300), requires_grad=False)
-    self.cfconv = torch.nn.Sequential(Linear(300, _nf), SSP(), Linear(_nf, _nf), SSP())
+    self.cfconv = torch.nn.Sequential(
+        Linear(300, _nf, bias=False), SSP(), Linear(_nf, _nf, bias=False), SSP()
+    )
     self.pre_conv = Linear(_nf, _nf)
     self.post_conv = torch.nn.Sequential(Linear(_nf, _nf), SSP(), Linear(_nf, _nf))
 
@@ -60,7 +62,9 @@ class SE3Layer(torch.nn.Module):
     self.rbf_freqs = Parameter(torch.arange(16), requires_grad=False)
     self.rsh_mod = RSHxyz(max_l=1)
     self.coupler = LeviCivitaCoupler(torch.LongTensor([_nf, _nf]))
-    self.filter_gen = torch.nn.Sequential(Linear(16, _nf), SSP(), Linear(_nf, _nf))
+    self.filter_gen = torch.nn.Sequential(
+        Linear(16, _nf, bias=False), SSP(), Linear(_nf, _nf, bias=False)
+    )
     self.pre_conv = IELin([_nf, _nf], [_nf, _nf])
     self.post_conv = torch.nn.ModuleList(
       [IELin([2*_nf, 3*_nf], [_nf, _nf]), SSP(), IELin([_nf, _nf], [_nf, _nf])]
