@@ -11,6 +11,8 @@ setup(
     description="A light-weight PyTorch extension for gauge-equivariant geometric learning",
     author="Zhuoran Qiao",
     author_email="zqiao@caltech.edu",
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     packages=find_packages(),
