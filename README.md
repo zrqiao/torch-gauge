@@ -77,7 +77,7 @@ class SE3Layer(torch.nn.Module):
     feat_in: SphericalTensor = vl.ndata[f"atomic_{l}"]
     pre_conv = vl.query_src(self.pre_conv(feat_in))
     filters_radial = self.filter_gen(
-      torch.sin(d_ij * self.rbf_freqs.view(1, 1, -1)) / d_ij.unsqueeze(-1) * poly_env(d_ij/5)
+      torch.sin(d_ij / 5 * self.rbf_freqs.view(1, 1, -1)) / d_ij * poly_env(d_ij/5)
     )
     filters = pre_conv.self_like(self.rsh_mod(r_ij).ten.unsqueeze(-1).mul(filters_radial).flatten(2, 3))
     coupling_out = self.post_conv[0](self.coupler(pre_conv, filters, overlap_out=False))
