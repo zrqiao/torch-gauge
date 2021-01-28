@@ -14,6 +14,7 @@ from sympy.physics.quantum.cg import CG
 
 from torch_gauge import ROOT_DIR
 from torch_gauge.o3.spherical import SphericalTensor
+from torch_gauge.o3.wigner import csh_to_rsh
 
 memory = Memory(os.path.join(ROOT_DIR, ".o3_cache"), verbose=0)
 
@@ -90,9 +91,40 @@ class LeviCivitaCoupler(torch.nn.Module):
             )
 
 
-@memory.cache
 def get_clebsch_gordan_coefficient(j1, j2, j, m1, m2, m):
     """
     Generate Clebsch-Gordan coefficients using sympy with caching
     """
-    return N(CG(j1, m1, j2, m2, j, m).doit())
+    # Matching the convention
+    return float(N(CG(j1, m1, j2, m2, j, m).doit()))
+
+
+# noinspection PyTypeChecker
+@memory.cache
+def get_rsh_cg_coefficients(j1, j2, j):
+    csh_cg = torch.zeros(2 * j1 + 1, 2 * j2 + 1, 2 * j + 1, dtype=torch.double)
+    for m1 in range(-j1, j1 + 1):
+        for m2 in range(-j2, j2 + 1):
+            if m1 + m2 < -j or m1 + m2 > j:
+                continue
+            csh_cg[j1 + m1, j2 + m2, j + m1 + m2] = get_clebsch_gordan_coefficient(
+                j1, j2, j, m1, m2, m1 + m2
+            )
+    c2r_j1, c2r_j2, c2r_j = csh_to_rsh(j1), csh_to_rsh(j2), csh_to_rsh(j)
+    # Adding a phase factor such that all coupling coefficients are real
+    rsh_cg = torch.einsum(
+        "abc,ai,bj,ck->ijk", csh_cg.to(torch.cdouble), c2r_j1, c2r_j2, c2r_j.conj()
+    ) * (-1j) ** (j1 + j2 + j)
+    assert torch.allclose(rsh_cg.imag, torch.zeros_like(csh_cg)), print(csh_cg, rsh_cg)
+    return cg_compactify(rsh_cg.real, j1, j2, j)
+
+
+def cg_compactify(coeffs, j1, j2, j):
+    j1s = torch.arange(-j1, j1 + 1).view(2 * j1 + 1, 1, 1).expand_as(coeffs)
+    j2s = torch.arange(-j2, j2 + 1).view(1, 2 * j2 + 1, 1).expand_as(coeffs)
+    js = torch.arange(-j, j + 1).view(1, 1, 2 * j + 1).expand_as(coeffs)
+    nonzero_mask = coeffs.abs() > 1e-12
+    return torch.stack(
+        [j1s[nonzero_mask], j2s[nonzero_mask], js[nonzero_mask], coeffs[nonzero_mask]],
+        dim=0,
+    )

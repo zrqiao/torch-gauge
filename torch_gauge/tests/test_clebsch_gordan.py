@@ -3,12 +3,13 @@ import torch
 from torch_gauge.o3.clebsch_gordan import (
     LeviCivitaCoupler,
     get_clebsch_gordan_coefficient,
+    get_rsh_cg_coefficients,
 )
 from torch_gauge.o3.spherical import SphericalTensor
 
 
 def test_generate_cg():
-    max_j = 4
+    max_j = 2
     for j1 in range(max_j + 1):
         for j2 in range(max_j + 1):
             for j in range(abs(j1 - j2), max_j + 1):
@@ -32,3 +33,10 @@ def test_levi_civita():
     cat_out = coupler(spten1, spten2, overlap_out=False)
     assert cat_out.ten.shape == (4, 6, 2, 144, 7)
     assert torch.all(cat_out.metadata.eq(torch.LongTensor([[36, 36]])))
+
+
+def test_rsh_cg_l1():
+    for j1 in range(4):
+        for j2 in range(4):
+            for j in range(4):
+                get_rsh_cg_coefficients(j1, j2, j)
