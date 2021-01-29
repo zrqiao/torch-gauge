@@ -133,18 +133,20 @@ def cg_compactify(coeffs, j1, j2, j):
 class CGCoupler(torch.nn.Module):
     """General vectorized Clebsch-Gordan coupling module"""
 
-    def __init__(self, metadata: torch.LongTensor, overlap_out=True):
+    # TODO: Add doc
+
+    def __init__(self, metadata: torch.LongTensor, overlap_out=True, trunc_in=False):
         super().__init__()
         assert metadata.dim == 1
         self._metadata = metadata
         self.layout = SphericalTensor.generate_rep_layout_1d_(self._metadata)
         if overlap_out:
             self.out_layout = self.layout
-            self._init_params(overlap_out=overlap_out)
+            self._init_params(overlap_out=overlap_out, trunc_in=trunc_in)
         else:
             raise NotImplementedError
 
-    def _init_params(self, overlap_out):
+    def _init_params(self, overlap_out, trunc_in):
         n_irreps_per_l = torch.arange(start=0, end=self._metadata.shape[0]) * 2 + 1
         repid_offsets = torch.cumsum(self._metadata * n_irreps_per_l, dim=0)
         repid_offsets = torch.cat([torch.LongTensor([0]), repid_offsets[:-1]])
@@ -153,13 +155,23 @@ class CGCoupler(torch.nn.Module):
             for lin1 in range(self._metadata.shape[0]):
                 for lin2 in range(self._metadata.shape[0]):
                     for lout in range(abs(lin1 - lin2), lin1 + lin2 + 1):
-                        if lout > self._metadata.shape[0]:
-                            continue
-                        degeneracy = min(
-                            self._metadata[lin1],
-                            self._metadata[lin2],
-                            self._metadata[lout],
-                        )
+                        if trunc_in:
+                            # Only allows inputs that can saturate all output ls
+                            if lin1+lin2 > self._metadata.shape[0]:
+                                continue
+                            degeneracy = min(
+                                self._metadata[lin1],
+                                self._metadata[lin2],
+                                self._metadata[lin1 + lin2],
+                            )
+                        else:
+                            if lout > self._metadata.shape[0]:
+                                continue
+                            degeneracy = min(
+                                self._metadata[lin1],
+                                self._metadata[lin2],
+                                self._metadata[lout],
+                            )
                         if degeneracy == 0:
                             continue
                         cg_source = get_rsh_cg_coefficients(lin1, lin2, lout)
@@ -190,7 +202,7 @@ class CGCoupler(torch.nn.Module):
         self.cg_tilde = torch.nn.Parameter(torch.cat(cg_tilde), requires_grad=False)
         self.repids_in1 = torch.nn.Parameter(torch.cat(repids_in1), requires_grad=False)
         self.repids_in2 = torch.nn.Parameter(torch.cat(repids_in2), requires_grad=False)
-        self.repids_in2 = torch.nn.Parameter(torch.cat(repids_in2), requires_grad=False)
+        self.repids_out = torch.nn.Parameter(torch.cat(repids_out), requires_grad=False)
 
     def forward(self, x1: SphericalTensor, x2: SphericalTensor) -> SphericalTensor:
         return NotImplementedError
