@@ -9,7 +9,7 @@ from torch_gauge.o3.spherical import SphericalTensor
 
 
 def test_generate_cg():
-    max_j = 2
+    max_j = 4
     for j1 in range(max_j + 1):
         for j2 in range(max_j + 1):
             for j in range(abs(j1 - j2), max_j + 1):

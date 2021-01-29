@@ -128,3 +128,69 @@ def cg_compactify(coeffs, j1, j2, j):
         [j1s[nonzero_mask], j2s[nonzero_mask], js[nonzero_mask], coeffs[nonzero_mask]],
         dim=0,
     )
+
+
+class CGCoupler(torch.nn.Module):
+    """General vectorized Clebsch-Gordan coupling module"""
+
+    def __init__(self, metadata: torch.LongTensor, overlap_out=True):
+        super().__init__()
+        assert metadata.dim == 1
+        self._metadata = metadata
+        self.layout = SphericalTensor.generate_rep_layout_1d_(self._metadata)
+        if overlap_out:
+            self.out_layout = self.layout
+            self._init_params(overlap_out=overlap_out)
+        else:
+            raise NotImplementedError
+
+    def _init_params(self, overlap_out):
+        n_irreps_per_l = torch.arange(start=0, end=self._metadata.shape[0]) * 2 + 1
+        repid_offsets = torch.cumsum(self._metadata * n_irreps_per_l, dim=0)
+        repid_offsets = torch.cat([torch.LongTensor([0]), repid_offsets[:-1]])
+        cg_tilde, repids_in1, repids_in2, repids_out = [], [], [], []
+        if overlap_out:
+            for lin1 in range(self._metadata.shape[0]):
+                for lin2 in range(self._metadata.shape[0]):
+                    for lout in range(abs(lin1 - lin2), lin1 + lin2 + 1):
+                        if lout > self._metadata.shape[0]:
+                            continue
+                        degeneracy = min(
+                            self._metadata[lin1],
+                            self._metadata[lin2],
+                            self._metadata[lout],
+                        )
+                        if degeneracy == 0:
+                            continue
+                        cg_source = get_rsh_cg_coefficients(lin1, lin2, lout)
+                        cg_segment = cg_source.repeat_interleave(degeneracy, dim=1)
+                        ns_segment = torch.arange(degeneracy).repeat(cg_source.shape[1])
+                        # Calculating the representation IDs for the coupling tensors
+                        repids_in1_3j = (
+                            repid_offsets[lin1]
+                            + (cg_segment[0] + lin1) * self._metadata[lin1]
+                            + ns_segment
+                        )
+                        repids_in2_3j = (
+                            repid_offsets[lin2]
+                            + (cg_segment[1] + lin2) * self._metadata[lin2]
+                            + ns_segment
+                        )
+                        repids_out_3j = (
+                            repid_offsets[lout]
+                            + (cg_segment[2] + lout) * self._metadata[lout]
+                            + ns_segment
+                        )
+                        cg_tilde.append(cg_segment[3])
+                        repids_in1.append(repids_in1_3j)
+                        repids_in2.append(repids_in2_3j)
+                        repids_out.append(repids_out_3j)
+        else:
+            raise NotImplementedError
+        self.cg_tilde = torch.nn.Parameter(torch.cat(cg_tilde), requires_grad=False)
+        self.repids_in1 = torch.nn.Parameter(torch.cat(repids_in1), requires_grad=False)
+        self.repids_in2 = torch.nn.Parameter(torch.cat(repids_in2), requires_grad=False)
+        self.repids_in2 = torch.nn.Parameter(torch.cat(repids_in2), requires_grad=False)
+
+    def forward(self, x1: SphericalTensor, x2: SphericalTensor) -> SphericalTensor:
+        return NotImplementedError
