@@ -191,6 +191,8 @@ class SphericalTensor:
             self.rep_layout[dotdim_idx][2, :],
             mul_ten,
         )
+        # Note that the argument names of index_add in pytorch is changing from tensor to source
+        # in 1.7-1.8. Not using keywords for compatibility
         if len(self.rep_dims) == 1:
             return out_ten
         elif len(self.rep_dims) == 2:
@@ -308,10 +310,7 @@ class SphericalTensor:
                 length=self.ten.shape[ops_dim] - l0_length,
             )
             # Subtract the L=0 offset in the pointer tensor
-            idx_ten = (
-                self.rep_layout[0][2, l0_length:]
-                .sub(l0_length)
-            )
+            idx_ten = self.rep_layout[0][2, l0_length:].sub(l0_length)
             invariant_rep = NormContraction1d.apply(
                 data_rep, idx_ten, norm_shape, ops_dim, self._norm_eps
             )
@@ -319,11 +318,17 @@ class SphericalTensor:
         elif len(self.rep_dims) == 2:
             idx_ten_0 = (
                 self.rep_layout[0][2, :]
-                .unsqueeze(1).expand(self.ten.shape[self.rep_dims[0]], self.ten.shape[self.rep_dims[1]])
+                .unsqueeze(1)
+                .expand(
+                    self.ten.shape[self.rep_dims[0]], self.ten.shape[self.rep_dims[1]]
+                )
             )
             idx_ten_1 = (
                 self.rep_layout[1][2, :]
-                .unsqueeze(0).expand(self.ten.shape[self.rep_dims[0]], self.ten.shape[self.rep_dims[1]])
+                .unsqueeze(0)
+                .expand(
+                    self.ten.shape[self.rep_dims[0]], self.ten.shape[self.rep_dims[1]]
+                )
             )
             idx_tens = torch.stack([idx_ten_0, idx_ten_1], dim=0)
             norm_shape = list(self.shape)

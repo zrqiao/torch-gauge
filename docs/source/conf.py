@@ -22,7 +22,7 @@ copyright = '2021, Zhuoran Qiao'
 author = 'Zhuoran Qiao'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.4'
+release = '0.0.5'
 
 
 # -- General configuration ---------------------------------------------------
@@ -32,14 +32,18 @@ release = '0.0.4'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
+    'sphinx.ext.viewcode',
     'recommonmark',
     'sphinx.ext.autosectionlabel',
 ]
 
 source_suffix = ['.rst', '.md']
+
+master_doc = 'index'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

@@ -6,12 +6,23 @@
 Welcome to Torch-Gauge's documentation!
 =======================================
 
+.. include:: readme.rst
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Overview
+   :hidden:
+
+   readme
+
+
 .. toctree::
    :maxdepth: 3
-   :caption: Contents:
+   :caption: Python API
+   :hidden:
 
-   modules
-   readme
+   torch_gauge
+   torch_gauge.o3
 
 
 Indices and tables

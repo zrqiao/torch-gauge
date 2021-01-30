@@ -5,7 +5,7 @@ See:
     Sakurai, J. J. "Modern Quantum Mechanics 2Nd Edition." Person New International edition (2014).
     Page 225, Eq. 3.8.49.
 
-and
+and:
     Schulten, Klaus, and Roy G. Gordon, Journal of Mathematical Physics 16.10 (1975): 1961-1970. Eq. 6, 9.
 """
 
@@ -276,9 +276,7 @@ class CGCoupler(torch.nn.Module):
         # Do not transfer metadata to device
         self.metadata_out = metadata_out
 
-    def forward(
-        self, x1: SphericalTensor, x2: SphericalTensor
-    ) -> SphericalTensor:
+    def forward(self, x1: SphericalTensor, x2: SphericalTensor) -> SphericalTensor:
         """
         Args:
             x1 (SphericalTensor): The first input ``SphericalTensor`` to be coupled,
@@ -298,8 +296,13 @@ class CGCoupler(torch.nn.Module):
         x1_tilde = torch.index_select(x1.ten, dim=coupling_dim, index=self.repids_in1)
         x2_tilde = torch.index_select(x2.ten, dim=coupling_dim, index=self.repids_in2)
         out_tilde = x1_tilde * x2_tilde * self.cg_tilde
-        out_shape = tuple(self.out_layout.shape[1] if d == coupling_dim else x1.ten.shape[d] for d in range(x1.ten.dim()))
-        out_ten = torch.zeros(out_shape, dtype=x1.ten.dtype, device=x1.ten.device).index_add_(
+        out_shape = tuple(
+            self.out_layout.shape[1] if d == coupling_dim else x1.ten.shape[d]
+            for d in range(x1.ten.dim())
+        )
+        out_ten = torch.zeros(
+            out_shape, dtype=x1.ten.dtype, device=x1.ten.device
+        ).index_add_(
             coupling_dim,
             self.repids_out,
             out_tilde,

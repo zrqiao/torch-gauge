@@ -26,8 +26,12 @@ class NormContraction1d(torch.autograd.Function):
     def backward(ctx, grad_output):
         """"""
         data_ten, dst_ten, norm_shifted = ctx.saved_tensors
-        gathered_grad_output = torch.index_select(grad_output, dim=ctx.dim, index=dst_ten)
-        gathered_norm_shifted = torch.index_select(norm_shifted, dim=ctx.dim, index=dst_ten)
+        gathered_grad_output = torch.index_select(
+            grad_output, dim=ctx.dim, index=dst_ten
+        )
+        gathered_norm_shifted = torch.index_select(
+            norm_shifted, dim=ctx.dim, index=dst_ten
+        )
         norm_grad = data_ten / gathered_norm_shifted
         grad_input = gathered_grad_output * norm_grad
         return grad_input, None, None, None, None
@@ -80,7 +84,9 @@ class NormContraction2d(torch.autograd.Function):
             dim=dims[0],
             index=cache_inds,
         )
-        gathered_norm_shifted = torch.index_select(norm_cache, dim=dims[0], index=cache_inds)
+        gathered_norm_shifted = torch.index_select(
+            norm_cache, dim=dims[0], index=cache_inds
+        )
         gathered_norm_shifted = gathered_norm_shifted.view(data_ten.shape)
         norm_grad = data_ten / gathered_norm_shifted
         grad_input = gathered_grad_output.view_as(norm_grad) * norm_grad

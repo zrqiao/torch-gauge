@@ -1,5 +1,5 @@
-torch\_gauge.o3 package
-=======================
+torch\_gauge.o3
+===============
 
 Submodules
 ----------
@@ -40,14 +40,6 @@ torch\_gauge.o3.wigner module
 -----------------------------
 
 .. automodule:: torch_gauge.o3.wigner
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: torch_gauge.o3
    :members:
    :undoc-members:
    :show-inheritance:
