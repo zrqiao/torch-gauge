@@ -64,7 +64,7 @@ def univec_cos(vec1: torch.Tensor, vec2: torch.Tensor):
 def rotation_matrix_xyz(phi, axis, dtype=torch.double):
     """
     Rotation matrix for the intrinsic rotation about the specified axis,
-    with the column-xyz (left-multiplication) convention
+    with the column-xyz (left-multiplication) convention.
     """
     if axis == "z":
         return torch.tensor(

@@ -1,10 +1,8 @@
 torch\_gauge
 ============
+Base data-objects and operations for manipulating geometric and relational data.
 
-Submodules
-----------
-
-torch\_gauge.geometric module
+torch\_gauge.geometric
 -----------------------------
 
 .. automodule:: torch_gauge.geometric
@@ -12,7 +10,7 @@ torch\_gauge.geometric module
    :undoc-members:
    :show-inheritance:
 
-torch\_gauge.nn module
+torch\_gauge.nn
 ----------------------
 
 .. automodule:: torch_gauge.nn
@@ -20,7 +18,7 @@ torch\_gauge.nn module
    :undoc-members:
    :show-inheritance:
 
-torch\_gauge.verlet\_list module
+torch\_gauge.verlet\_list
 --------------------------------
 
 .. automodule:: torch_gauge.verlet_list

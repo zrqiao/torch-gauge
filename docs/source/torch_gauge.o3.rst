@@ -1,34 +1,9 @@
 torch\_gauge.o3
 ===============
+Representations and algebra for data that transform under the O(3) group.
 
-Submodules
-----------
 
-torch\_gauge.o3.clebsch\_gordan module
---------------------------------------
-
-.. automodule:: torch_gauge.o3.clebsch_gordan
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-torch\_gauge.o3.functional module
----------------------------------
-
-.. automodule:: torch_gauge.o3.functional
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-torch\_gauge.o3.rsh module
---------------------------
-
-.. automodule:: torch_gauge.o3.rsh
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-torch\_gauge.o3.spherical module
+torch\_gauge.o3.spherical
 --------------------------------
 
 .. automodule:: torch_gauge.o3.spherical
@@ -36,10 +11,34 @@ torch\_gauge.o3.spherical module
    :undoc-members:
    :show-inheritance:
 
-torch\_gauge.o3.wigner module
+torch\_gauge.o3.functional
+---------------------------------
+
+.. automodule:: torch_gauge.o3.functional
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+torch\_gauge.o3.rsh
+--------------------------
+
+.. automodule:: torch_gauge.o3.rsh
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+torch\_gauge.o3.wigner
 -----------------------------
 
 .. automodule:: torch_gauge.o3.wigner
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+torch\_gauge.o3.clebsch\_gordan
+--------------------------------------
+
+.. automodule:: torch_gauge.o3.clebsch_gordan
    :members:
    :undoc-members:
    :show-inheritance:

@@ -109,7 +109,7 @@ class LeviCivitaCoupler(torch.nn.Module):
 
 def get_clebsch_gordan_coefficient(j1, j2, j, m1, m2, m):
     """
-    Generate Clebsch-Gordan coefficients using sympy with caching
+    Generate Clebsch-Gordan coefficients using sympy with caching.
     """
     # Matching the convention
     return float(N(CG(j1, m1, j2, m2, j, m).doit()))
@@ -151,7 +151,7 @@ class CGCoupler(torch.nn.Module):
     General vectorized Clebsch-Gordan coupling module.
 
     Note:
-        When the CGCoupler class is instantiated, a compact presentation of representation indices
+        When the CGCoupler class is instantiated, a compact view of representation indices
         is generated for vectorizing Clebsch-Gordan coupling between two SphericalTensors. Depending
         on the setup of input SphericalTensors, this tabulating step can be time-consuming; the CGCoupler
         parameters should be saved when the user intends to use the model for inference.

@@ -43,7 +43,7 @@ class Swish(torch.nn.Module):
 
 class IELin(torch.nn.Module):
     """
-    Irrep-wise Equivariant Linear Layer
+    Irrep-wise Equivariant Linear Layer.
 
     This module takes a spherical tensor and perform linear transformation within
     the feature channels spanned by each irreducible representation index, (l, m):

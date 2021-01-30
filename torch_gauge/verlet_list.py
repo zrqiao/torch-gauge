@@ -13,7 +13,7 @@ class VerletList:
 
     Assuming in-edges and out-edges are identical (undirected graph).
 
-    Note:
+    Warning:
         Due to the padding, the current VerletList scheme will break vanilla Batch Normalization
         operation on edges. MaskedBatchNorm2d will be implemented in the future for edge feature
         normalization.
@@ -298,7 +298,7 @@ class VerletList:
     def to(self, device):
         """
         Args:
-              device (torch.device): The device to transfer the data of the VerletList.
+              device (torch.device): The device to which the data of the VerletList will be transferred.
         """
         self.neighbor_idx = self.neighbor_idx.to(device)
         self.ndata = {k: v.to(device) for k, v in self.ndata.items()}
@@ -316,7 +316,7 @@ class VerletList:
         Returns:
             A VerletList instance containing batched data and indices.
 
-        Note:
+        Warning:
             In the current version, taking batch of batched VerletLists is not supported.
         """
         batched_vl = VerletList()
