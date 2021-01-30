@@ -1,7 +1,12 @@
 """
-SO(3) Clebsch-Gordan coefficients and the coupler
-See Page 225, Eq. 3.8.49 of J. J. Sakurai, and Eq. 6, 9 of
- Schulten, Klaus, and Roy G. Gordon, Journal of Mathematical Physics 16.10 (1975): 1961-1970
+SO(3) Clebsch-Gordan coefficients and the associated CUDA-compatible coupler modules.
+
+See:
+    Sakurai, J. J. "Modern Quantum Mechanics 2Nd Edition." Person New International edition (2014).
+    Page 225, Eq. 3.8.49.
+
+and
+    Schulten, Klaus, and Roy G. Gordon, Journal of Mathematical Physics 16.10 (1975): 1961-1970. Eq. 6, 9.
 """
 
 
@@ -22,7 +27,8 @@ memory = Memory(os.path.join(ROOT_DIR, ".o3_cache"), verbose=0)
 class LeviCivitaCoupler(torch.nn.Module):
     """
     Simple tensor coupling module when max_l==1.
-    The input spherical tensors must have n_rep_dims==1 and aligned dimensions
+
+    The input spherical tensors must have n_rep_dims==1 and aligned dimensions.
     """
 
     def __init__(self, metadata: torch.LongTensor):
@@ -34,6 +40,16 @@ class LeviCivitaCoupler(torch.nn.Module):
         self._metadata = metadata
 
     def forward(self, x1: SphericalTensor, x2: SphericalTensor, overlap_out=True):
+        """
+        Args:
+            x1 (SphericalTensor): The first input ``SphericalTensor`` to be coupled.
+            x2 (SphericalTensor): The second input ``SphericalTensor`` to be coupled.
+            overlap_out (bool): If true, the coupling outputs from the same input feature index but
+                different (l1, l2)s will be accumulated to the same representation index of the output SphericalTensor.
+
+        Returns:
+            A new SphericalTensor from Levi-Civita coupling.
+        """
         assert x1.metadata.shape[0] == 1
         assert x2.metadata.shape[0] == 1
         assert x1.rep_dims[0] == x2.rep_dims[0]
@@ -131,78 +147,166 @@ def cg_compactify(coeffs, j1, j2, j):
 
 
 class CGCoupler(torch.nn.Module):
-    """General vectorized Clebsch-Gordan coupling module"""
+    """
+    General vectorized Clebsch-Gordan coupling module.
 
-    # TODO: Add doc
+    Note:
+        When the CGCoupler class is instantiated, a compact presentation of representation indices
+        is generated for vectorizing Clebsch-Gordan coupling between two SphericalTensors. Depending
+        on the setup of input SphericalTensors, this tabulating step can be time-consuming; the CGCoupler
+        parameters should be saved when the user intends to use the model for inference.
 
-    def __init__(self, metadata: torch.LongTensor, overlap_out=True, trunc_in=False):
+    Attributes:
+        metadata_in1 (torch.LongTensor): The metadata of the first input SphericalTensor to be coupled.
+        metadata_in2 (torch.LongTensor): The metadata of the second input SphericalTensor to be coupled.
+        metadata_out (torch.LongTensor): The metadata of the output SphericalTensor. Note that it depends
+            on the coupling specifications, `overlap_out` and `trunc_in`.
+
+    Args:
+        metadata_1 (torch.LongTensor): The representation metadata of the first tensor to be coupled.
+        metadata_2 (torch.LongTensor): The representation metadata of the second tensor to be coupled,
+             must have the same length (number of l's) as ``metadata_1``.
+        overlap_out (bool): If true, the coupling outputs from the same input feature index but different (l1, l2)s
+             will be accumulated to the same representation index of the output SphericalTensor.
+        trunc_in (bool): If true, the allowed feature indices (n) will be further truncated such that for
+             each set of terms (l1, l2, n), the coupling results will saturate all possible (l_out, n) values
+             of the output SphericalTensor.
+    """
+
+    def __init__(
+        self,
+        metadata_1: torch.LongTensor,
+        metadata_2: torch.LongTensor,
+        overlap_out=True,
+        trunc_in=True,
+    ):
         super().__init__()
-        assert metadata.dim == 1
-        self._metadata = metadata
-        self.layout = SphericalTensor.generate_rep_layout_1d_(self._metadata)
-        if overlap_out:
-            self.out_layout = self.layout
-            self._init_params(overlap_out=overlap_out, trunc_in=trunc_in)
-        else:
-            raise NotImplementedError
+        assert metadata_1.dim == 1
+        assert metadata_2.dim == 1
+        assert metadata_1.shape[0] == metadata_2.shape[0]
+        self.metadata_out = None
+        self.metadata_in1 = metadata_1
+        self.metadata_in2 = metadata_2
+        self._init_params(overlap_out, trunc_in)
+        self.out_layout = SphericalTensor.generate_rep_layout_1d_(self.out_layout)
 
     def _init_params(self, overlap_out, trunc_in):
-        n_irreps_per_l = torch.arange(start=0, end=self._metadata.shape[0]) * 2 + 1
-        repid_offsets = torch.cumsum(self._metadata * n_irreps_per_l, dim=0)
-        repid_offsets = torch.cat([torch.LongTensor([0]), repid_offsets[:-1]])
+        metadata_in = torch.stack([self.metadata_in1, self.metadata_in2], dim=0)
+        max_n_out = torch.maximum(self.metadata_in1, self.metadata_in2)
+        n_irreps_per_l = torch.arange(start=0, end=metadata_in.shape[1]) * 2 + 1
+        repid_offsets_in = torch.cumsum(
+            metadata_in * n_irreps_per_l.unsqueeze(0), dim=1
+        )
+        repid_offsets_in = torch.cat(
+            [torch.LongTensor([[0, 0]]), repid_offsets_in[:, :-1]], dim=1
+        )
         cg_tilde, repids_in1, repids_in2, repids_out = [], [], [], []
-        if overlap_out:
-            for lin1 in range(self._metadata.shape[0]):
-                for lin2 in range(self._metadata.shape[0]):
-                    for lout in range(abs(lin1 - lin2), lin1 + lin2 + 1):
-                        if trunc_in:
-                            # Only allows inputs that can saturate all output ls
-                            if lin1+lin2 > self._metadata.shape[0]:
-                                continue
-                            degeneracy = min(
-                                self._metadata[lin1],
-                                self._metadata[lin2],
-                                self._metadata[lin1 + lin2],
-                            )
-                        else:
-                            if lout > self._metadata.shape[0]:
-                                continue
-                            degeneracy = min(
-                                self._metadata[lin1],
-                                self._metadata[lin2],
-                                self._metadata[lout],
-                            )
-                        if degeneracy == 0:
+        max_l = metadata_in.shape[1]
+        # Tabulate the output metadata and allowed coupling terms
+        valid_coupling_ids = []
+        metadata_out = torch.zeros_like(max_n_out)
+        for lout in range(max_l):
+            for lin1 in range(max_l):
+                for lin2 in range(max_l):
+                    if lin1 + lin2 < lout or abs(lin1 - lin2) > lout:
+                        continue
+                    if trunc_in:
+                        if lin1 + lin2 > max_l:
                             continue
-                        cg_source = get_rsh_cg_coefficients(lin1, lin2, lout)
-                        cg_segment = cg_source.repeat_interleave(degeneracy, dim=1)
-                        ns_segment = torch.arange(degeneracy).repeat(cg_source.shape[1])
-                        # Calculating the representation IDs for the coupling tensors
-                        repids_in1_3j = (
-                            repid_offsets[lin1]
-                            + (cg_segment[0] + lin1) * self._metadata[lin1]
-                            + ns_segment
+                        degeneracy = min(
+                            metadata_in[0, lin1],
+                            metadata_in[1, lin2],
+                            max_n_out[lin1 + lin2],
                         )
-                        repids_in2_3j = (
-                            repid_offsets[lin2]
-                            + (cg_segment[1] + lin2) * self._metadata[lin2]
-                            + ns_segment
+                    else:
+                        if lout > max_l:
+                            continue
+                        degeneracy = min(
+                            metadata_in[0, lin1],
+                            metadata_in[1, lin2],
+                            max_n_out[lout],
                         )
-                        repids_out_3j = (
-                            repid_offsets[lout]
-                            + (cg_segment[2] + lout) * self._metadata[lout]
-                            + ns_segment
-                        )
-                        cg_tilde.append(cg_segment[3])
-                        repids_in1.append(repids_in1_3j)
-                        repids_in2.append(repids_in2_3j)
-                        repids_out.append(repids_out_3j)
-        else:
-            raise NotImplementedError
+                    if not overlap_out:
+                        metadata_out[lout] += degeneracy
+                    elif degeneracy > metadata_out[lout]:
+                        metadata_out[lout] = degeneracy
+                    valid_coupling_ids.append((lout, lin1, lin2, degeneracy))
+
+        repid_offsets_out = torch.cumsum(metadata_out * n_irreps_per_l, dim=0)
+        repid_offsets_out = torch.cat(
+            [torch.LongTensor([0]), repid_offsets_out[:-1]], dim=0
+        )
+
+        out_repid_offset = 0
+        # Generate flattened coupling coefficients
+        for (lout, lin1, lin2, degeneracy) in valid_coupling_ids:
+            cg_source = get_rsh_cg_coefficients(lin1, lin2, lout)
+            cg_segment = cg_source.repeat_interleave(degeneracy, dim=1)
+            ns_segment = torch.arange(degeneracy).repeat(cg_source.shape[1])
+            # Calculating the representation IDs for the coupling tensors
+            repids_in1_3j = (
+                repid_offsets_in[0, lin1]
+                + (cg_segment[0] + lin1) * metadata_in[0, lin1]
+                + ns_segment
+            )
+            repids_in2_3j = (
+                repid_offsets_in[1, lin2]
+                + (cg_segment[1] + lin2) * metadata_in[1, lin2]
+                + ns_segment
+            )
+            if overlap_out:
+                out_repid_offset = repid_offsets_out[lout]
+            repids_out_3j = (
+                out_repid_offset
+                + (cg_segment[2] + lout) * metadata_out[lout]
+                + ns_segment
+            )
+
+            cg_tilde.append(cg_segment[3])
+            repids_in1.append(repids_in1_3j)
+            repids_in2.append(repids_in2_3j)
+            repids_out.append(repids_out_3j)
+            if not overlap_out:
+                out_repid_offset += degeneracy * (2 * lout + 1)
+
         self.cg_tilde = torch.nn.Parameter(torch.cat(cg_tilde), requires_grad=False)
         self.repids_in1 = torch.nn.Parameter(torch.cat(repids_in1), requires_grad=False)
         self.repids_in2 = torch.nn.Parameter(torch.cat(repids_in2), requires_grad=False)
         self.repids_out = torch.nn.Parameter(torch.cat(repids_out), requires_grad=False)
+        # Do not transfer metadata to device
+        self.metadata_out = metadata_out
 
-    def forward(self, x1: SphericalTensor, x2: SphericalTensor) -> SphericalTensor:
-        return NotImplementedError
+    def forward(
+        self, x1: SphericalTensor, x2: SphericalTensor
+    ) -> SphericalTensor:
+        """
+        Args:
+            x1 (SphericalTensor): The first input ``SphericalTensor`` to be coupled,
+                must have exactly 1 representation dimension.
+            x2 (SphericalTensor): The second input ``SphericalTensor`` to be coupled,
+                must have exactly 1 representation dimension.
+
+        Returns:
+            A new SphericalTensor with ``self.metadata_out`` from C-G coupling.
+        """
+        assert len(x1.rep_dims) == 1
+        assert len(x2.rep_dims) == 1
+        assert x1.rep_dims[0] == x2.rep_dims[0]
+        coupling_dim = x1.rep_dims[0]
+        assert torch.all(x1.metadata[0].eq(self.metadata_in1))
+        assert torch.all(x2.metadata[0].eq(self.metadata_in2))
+        x1_tilde = torch.index_select(x1.ten, dim=coupling_dim, index=self.repids_in1)
+        x2_tilde = torch.index_select(x2.ten, dim=coupling_dim, index=self.repids_in2)
+        out_tilde = x1_tilde * x2_tilde * self.cg_tilde
+        out_shape = tuple(self.out_layout.shape[1] if d == coupling_dim else x1.ten.shape[d] for d in range(x1.ten.dim()))
+        out_ten = torch.zeros(out_shape, dtype=x1.ten.dtype, device=x1.ten.device).index_add_(
+            coupling_dim,
+            self.repids_out,
+            out_tilde,
+        )
+        return SphericalTensor(
+            out_ten,
+            rep_dims=(coupling_dim,),
+            metadata=self.metadata_out,
+            rep_layout=(self.out_layout,),
+        )

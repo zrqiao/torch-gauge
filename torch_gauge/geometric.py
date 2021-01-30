@@ -1,5 +1,5 @@
 """
-Geometric operations on point-clouds and manifolds
+Geometric operations on point-clouds and manifolds.
 """
 import math
 
@@ -8,16 +8,23 @@ import torch
 
 class UnivecAngle(torch.autograd.Function):
     """
-    Backward-robust angle calculation between two unit vectors
-    See https://scicomp.stackexchange.com/questions/27689/numerically-stable-way-of-computing-angles-between-vectors
-    Also see https://www.cs.utexas.edu/users/evouga/uploads/4/5/6/8/45689883/turning.pdf which is algebraically
-    simpler but involves more forward arithmetic operations
-    On the benchmark CPU, tensor.norm() is much slower than dot and 2x slower than
-    cross product. We take the second approach here
+    Backward-robust angle calculation between two unit vectors.
+
+    Note:
+        For possible evaluation schemes, see:
+            https://scicomp.stackexchange.com/questions/27689/numerically-stable-way-of-computing-angles-between-vectors
+
+        Also see:
+            https://www.cs.utexas.edu/users/evouga/uploads/4/5/6/8/45689883/turning.pdf
+        which is algebraically simpler but involves more forward arithmetic operations.
+
+        On the benchmark CPU, tensor.norm() is much slower than dot and 2x slower than
+        cross product. We take the second approach here.
     """
 
     @staticmethod
     def forward(ctx, vec1, vec2):
+        """"""
         cross_vec = torch.cross(vec1, vec2, dim=-1)
         cross_norm = cross_vec.pow(2).sum(dim=-1).sqrt()
         vec_dot = vec1.mul(vec2).sum(-1)
@@ -27,6 +34,7 @@ class UnivecAngle(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
+        """"""
         vec1, vec2, cross_vec, cross_norm = ctx.saved_tensors
         cross_norm = cross_norm.unsqueeze(-1).expand_as(cross_vec)
         z = cross_vec.div(cross_norm)
@@ -47,14 +55,16 @@ def univec_angle_unsafe(vec1: torch.Tensor, vec2: torch.Tensor):
 
 
 def univec_cos(vec1: torch.Tensor, vec2: torch.Tensor):
-    """Returns cos(\theta) for angular embeddings"""
+    """
+    Returns :math:`\cos(\theta)` for backward-robust angle calculations.
+    """
     return vec1.mul(vec2).sum(-1)
 
 
 def rotation_matrix_xyz(phi, axis, dtype=torch.double):
     """
     Rotation matrix for the intrinsic rotation about the specified axis,
-     with the column-xyz (left-multiplication) convention
+    with the column-xyz (left-multiplication) convention
     """
     if axis == "z":
         return torch.tensor(
@@ -88,7 +98,7 @@ def rotation_matrix_xyz(phi, axis, dtype=torch.double):
 
 
 class Chebyshev(torch.nn.Module):
-    """Generating Chebshev polynomials from powers"""
+    """The Module to generate Chebshev polynomials up to the given order."""
 
     def __init__(self, order):
         super(Chebyshev, self).__init__()
@@ -99,8 +109,8 @@ class Chebyshev(torch.nn.Module):
 
     def _init_coefficients(self):
         """
-        Generating combination coefficients using recursion
-        Starting from order 1
+        Generating combination coefficients using recursion,
+        starting from order 1.
         """
         coeff = torch.zeros(self.order + 1, self.order + 1)
         coeff[0, 0] = 1
@@ -111,6 +121,7 @@ class Chebyshev(torch.nn.Module):
         self.cheb_coeff = torch.nn.Parameter(coeff[:, 1:], requires_grad=False)
 
     def forward(self, x):
+        """"""
         size = (*x.shape, self.order + 1)
         x = x.unsqueeze(-1).expand(size).pow(self.orders)
         out = torch.matmul(x, self.cheb_coeff)
@@ -118,8 +129,11 @@ class Chebyshev(torch.nn.Module):
 
 
 def poly_env(d, p=6):
-    """A polynomial wrapper defined in J. Klicpera, J. Groß,
-    and S. G¨unnemann, arXiv preprint arXiv:2003.03123 (2020)"""
+    """
+    A polynomial wrapper defined in:
+
+        J. Klicpera, J. Groß, and S. G¨unnemann, arXiv preprint arXiv:2003.03123 (2020).
+    """
     return (
         1
         - (p + 1) * (p + 2) // 2 * d ** p

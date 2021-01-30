@@ -8,11 +8,18 @@ from torch_gauge.o3.spherical import SphericalTensor
 
 @dataclass
 class VerletList:
+    """
+    The padded Verlet-List class for tracking and manipulating relational data.
+
+    Assuming in-edges and out-edges are identical (undirected graph).
+
+    Note:
+        Due to the padding, the current VerletList scheme will break vanilla Batch Normalization
+        operation on edges. MaskedBatchNorm2d will be implemented in the future for edge feature
+        normalization.
+    """
+
     def __init__(self):
-        """
-        Assuming in-edges and out-edges are identical (undirected graph)
-        WARNING: the current Verlet-list scheme will break vanilla edge BatchNorm
-        """
         self.neighbor_idx = None
         self.ndata = {}
         self.edata = {}
@@ -100,8 +107,10 @@ class VerletList:
 
     def from_dgl(self, g: "dgl.DGLGraph", padding_size, nkeys, ekeys):
         """
-        The interface for generating Verlet-list from dgl.DGLGraph
-        Only scalar type tensors are supported
+        The interface for generating Verlet-list from the ``dgl.DGLGraph`` class
+        in the DGL library https://docs.dgl.ai/api/python/dgl.DGLGraph.html.
+
+        Only scalar type tensors are supported.
         """
         self.PADSIZE = padding_size
         self.n_nodes = g.num_nodes()
@@ -218,9 +227,13 @@ class VerletList:
     def query_src(self, src_feat):
         """
         Returns the src-node data scattered into the neighbor-list frame.
+
         When applied to an edge-data tensor, this function generates a higher-order
-         view (k+1 hop) of the underlying k-hop graph structure.
-        src_feat must be contiguous.
+        view (k+1 hop) of the underlying k-hop graph structure.
+
+        Args:
+            src_feat (torch.Tensor or SphericalTensor):
+                The data to be queried, must be contiguous.
         """
         flattened_neighboridx = self.neighbor_idx.view(-1)
         if isinstance(src_feat, torch.Tensor):
@@ -248,7 +261,15 @@ class VerletList:
 
     def to_src_first_view(self, data):
         """
-        Flipping src / dst node indexing order without inverting the data
+        Flipping src / dst node indexing order without inverting the data.
+
+        Note:
+            When the underlying data is a dense matrix, this operation reduces to
+            a matrix transpose operation.
+
+        Args:
+            data (torch.Tensor or SphericalTensor):
+                The data to be transposed, must be contiguous.
         """
         scatter_ten = (self.neighbor_idx * self.PADSIZE + self._dst_edim_locators)[
             self.edge_mask
@@ -275,6 +296,10 @@ class VerletList:
             raise NotImplementedError
 
     def to(self, device):
+        """
+        Args:
+              device (torch.device): The device to transfer the data of the VerletList.
+        """
         self.neighbor_idx = self.neighbor_idx.to(device)
         self.ndata = {k: v.to(device) for k, v in self.ndata.items()}
         self.edata = {k: v.to(device) for k, v in self.edata.items()}
@@ -286,8 +311,13 @@ class VerletList:
     @staticmethod
     def batch(vls: List["VerletList"]):
         """
-        WARNING: In the current version, taking batch of batches will
-         break the offset indices
+        Batching a list of VerletLists.
+
+        Returns:
+            A VerletList instance containing batched data and indices.
+
+        Note:
+            In the current version, taking batch of batched VerletLists is not supported.
         """
         batched_vl = VerletList()
         batched_vl.PADSIZE = vls[0].PADSIZE

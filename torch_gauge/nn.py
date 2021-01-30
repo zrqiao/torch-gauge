@@ -1,27 +1,35 @@
+import math
+
 import torch
+import torch.nn.functional as F
 
 from torch_gauge.o3.spherical import SphericalTensor
 
 
 class SSP(torch.nn.Softplus):
-    """Shifted SoftPlus activation"""
+    """Shifted SoftPlus activation function."""
 
     def __init__(self, beta=1, threshold=20):
         super().__init__(beta, threshold)
 
     def forward(self, input):
+        """"""
         return F.softplus(input, self.beta, self.threshold) - math.sqrt(2)
 
 
 class Swish_fn(torch.autograd.Function):
+    """Swish activation function."""
+
     @staticmethod
     def forward(ctx, i):
+        """"""
         result = i * torch.sigmoid(i)
         ctx.save_for_backward(i)
         return result
 
     @staticmethod
     def backward(ctx, grad_output):
+        """"""
         i = ctx.saved_tensors[0]
         sigmoid_i = torch.sigmoid(i)
         return grad_output * (sigmoid_i * (1 + i * (1 - sigmoid_i)))
@@ -29,37 +37,39 @@ class Swish_fn(torch.autograd.Function):
 
 class Swish(torch.nn.Module):
     def forward(self, input_tensor):
+        """"""
         return Swish_fn.apply(input_tensor)
 
 
 class IELin(torch.nn.Module):
-    r"""
+    """
     Irrep-wise Equivariant Linear Layer
 
     This module takes a spherical tensor and perform linear transformation within
-     the feature channels spanned by each irreducible representation index, (l, m):
+    the feature channels spanned by each irreducible representation index, (l, m):
 
-    \f[
-        \mathbf{h}^{\textrm{out}}_{l,m} = \mathbf{W}^{l} \cdot \mathbf{h}^{\textrm{in}}_{l,m}
-    \f]
+    .. math::
+
+        \mathbf{h}^{\mathrm{out}}_{l,m} = \mathbf{W}^{l} \cdot \mathbf{h}^{\mathrm{in}}_{l,m}
 
     The matrix multiplication is always performed on the last dimension of the spherical tensors.
 
-    To vectorize: the coefficient matrix \f$\mathbf{W}^{l}\f$ is stored as a flattened 1D tensor,
-     together with a block-sparse layout tensor in the COO format; the coefficients
-     are gathered to the block-sparse matrix and converted to the CSR format in runtime.
-     May be only beneficial when the batch size is small.
+    Note:
+        The implementation of this operation is not yet optimized. To vectorize it,
+        the coefficient matrix :math:`\mathbf{W}^{l}` is stored as a flattened 1D tensor,
+        together with a block-sparse layout tensor in the COO format; the coefficients
+        should be gathered to the block-sparse matrix and converted to the CSR format in runtime.
+        May be only beneficial when the batch size is small.
 
-    In the future, we should make it a CUDA kernel to avoid serial operations or redundant
-     type conversions for sparse matrices. The first optimization we should do is to
-     enable ILP by executing multiple CUDA streams.
+        In the future, we should make it a CUDA kernel to avoid serial operations or redundant
+        type conversions for sparse matrices. The first optimization we should do is to
+        enable ILP by executing multiple CUDA streams.
+
     Attributes:
         metadata_in (torch.LongTensor): the number of non-degenerate feature channels of the input tensor
-         for each l (and the associated m(s)).
+            for each l (and the associated m(s)).
         metadata_out (torch.LongTensor): the number of non-degenerate feature channels of the output tensor
-         for each l (and the associated m(s)).a
-    Returns:
-        The data tensor of the output spherical tensor.
+            for each l (and the associated m(s)).
     """
 
     def __init__(self, metadata_in, metadata_out):
@@ -88,13 +98,19 @@ class IELin(torch.nn.Module):
         self.num_out_channels = torch.sum(self._metadata_out).item()
 
     def forward(self, x: SphericalTensor) -> SphericalTensor:
+        """
+        Args:
+            x: The input SphericalTensor.
+
+        Returns:
+            The data tensor of the output spherical tensor.
+        """
         assert x.rep_dims[-1] == x.ten.dim() - 1
         assert torch.all(x.metadata[-1].eq(self._metadata_in)), (
             f"Expected the SphericalTensor x and self._metadata_in to have the "
             f"same irrep metadata along the last dimension, got {x.metadata[-1]}"
             f" and {self._metadata_in} instead"
         )
-        # TODO: vectorization
         outs = []
         for l, linear_l in enumerate(self.linears):
             if linear_l is None:
@@ -119,19 +135,16 @@ class IELin(torch.nn.Module):
 
 
 class RepNorm1d(torch.nn.Module):
-    r"""
+    """
     The (experimental) Representation Normalization layer.
 
-    \f[
-        RepNorm(\mathbf{h})_{l,m} = \frac{BatchNorm(||\mathbf{h}_l||)}{\sqrt{2l+1}} \cdot
-         \frac{\mathbf{h}_{l}}{ |(1-\bm{\beta})||\mathbf{h}_{l}|| + \bm{\beta}| + \epsilon}
-    \f]
+    .. math::
 
-    Heuristically, the trainable \f$\beta\f$ controls the fraction of norm information to be retained.
+        \mathrm{RepNorm}(\mathbf{h})_{l,m} = \\frac{\mathrm{BatchNorm}(||\mathbf{h}_l||)}{\sqrt{2l+1}}
+        \cdot \\frac{\mathbf{h}_{l}}{ |(1-{\\beta})||\mathbf{h}_{l}|| + {\\beta}| + \\epsilon}
 
-    Returns:
-        normed_ten: the normed invariant content
-        gauge_ten: the "pure gauge" spherical tensor
+    Heuristically, the trainable :math:`\mathbf{\\beta}` controls the fraction of norm
+    information to be retained.
     """
 
     def __init__(self, num_channels, momentum=0.1, eps=1e-2):
@@ -145,6 +158,16 @@ class RepNorm1d(torch.nn.Module):
         self.beta = torch.nn.Parameter(torch.rand(self._num_channels))
 
     def forward(self, x: SphericalTensor) -> (torch.Tensor, SphericalTensor):
+        """
+        Args:
+            x: The input SphericalTensor.
+
+        Returns:
+            (tuple): tuple containing:
+                (torch.Tensor): The normalized invariant content.
+
+                (SphericalTensor): The "pure gauge" spherical tensor.
+        """
         x0 = x.invariant()
         assert x0.dim() == 2
         x1 = self.batchnorm(x0)

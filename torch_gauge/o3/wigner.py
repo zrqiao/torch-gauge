@@ -1,8 +1,9 @@
 """
-Wigner (rotation) matrices for complex and real spherical harmonics
+Wigner (rotation) matrices for complex and real spherical harmonics.
+
 Evaluation and symbolic convention follows:
- Sakurai, J. J. "Modern Quantum Mechanics 2Nd Edition." Person New International edition (2014).
- Page 238, Eq. 3.9.33.
+    Sakurai, J. J. "Modern Quantum Mechanics 2Nd Edition." Person New International edition (2014).
+    Page 238, Eq. 3.9.33.
 """
 
 import math
@@ -56,7 +57,8 @@ def wigner_small_d_csh(j, beta):
 
 def wigner_D_csh(j, alpha, beta, gamma):
     """
-    Euler rotation for complex spherical harmonics
+    Euler rotation for complex spherical harmonics.
+
     Contra-variant convention, for right multiplication
     """
     ms = torch.arange(-j, j + 1)

@@ -1,8 +1,9 @@
 """
-Real Solid Harmonics and Spherical Harmonics (Ket state)
+Real Solid Harmonics and Spherical Harmonics (Ket state).
+
 The evalulation scheme, convention and ordering of representations follows:
- Helgaker, Trygve, Poul Jorgensen, and Jeppe Olsen. Molecular electronic-structure theory.
- John Wiley & Sons, 2014. Page 215, Eq. 6.4.47
+    Helgaker, Trygve, Poul Jorgensen, and Jeppe Olsen. Molecular electronic-structure theory.
+    John Wiley & Sons, 2014. Page 215, Eq. 6.4.47
 """
 
 import os
@@ -67,12 +68,19 @@ def get_xyzcoeff_lm(l, m):
 
 class RSHxyz(torch.nn.Module):
     """
+    The module to generate Real Spherical Harmonics up to the given order from
+    (batched) xyz coordinates.
+
     Using pre-generated powers of x,y,z components, stored as a (i_{tuv}^{lm} x 3) tensor
     and the combination coefficients C^{lm}_{tuv}, and a pointer tensor {l(l+1)+m}_i
-    Then using torch.prod() and scatter_add to broadcast into real solid harmonics
+    to track the real spherical harmonics coefficients. Then using
+    torch.prod() and scatter_add to broadcast into RSHs.
+
+    Args:
+        max_l (int): The maximum order (l) of the desired spherical harmonics.
     """
 
-    def __init__(self, max_l):
+    def __init__(self, max_l: int):
         super().__init__()
         self.max_l = max_l
         self._init_coefficients()
@@ -102,6 +110,7 @@ class RSHxyz(torch.nn.Module):
         )
 
     def forward(self, xyz) -> SphericalTensor:
+        """"""
         in_shape = xyz.shape
         xyz = xyz.view(-1, 3)
         xyz_poly = torch.pow(xyz.unsqueeze(-1), self.xyzpows.unsqueeze(0)).prod(dim=1)
