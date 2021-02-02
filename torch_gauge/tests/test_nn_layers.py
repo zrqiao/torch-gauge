@@ -5,7 +5,7 @@ Testing Spherical neural operations
 import torch
 
 from torch_gauge.nn import IELin, RepNorm1d
-from torch_gauge.o3.spherical import SphericalTensor
+from torch_gauge.o3 import SphericalTensor
 
 
 def test_IELin_forward_1d():

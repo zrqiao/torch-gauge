@@ -183,6 +183,8 @@ class CGCoupler(torch.nn.Module):
         dtype=torch.float,
     ):
         super().__init__()
+        metadata_1 = torch.LongTensor(metadata_1)
+        metadata_2 = torch.LongTensor(metadata_2)
         assert metadata_1.dim() == 1
         assert metadata_2.dim() == 1
         assert metadata_1.shape[0] == metadata_2.shape[0]
@@ -204,13 +206,13 @@ class CGCoupler(torch.nn.Module):
             [torch.LongTensor([[0], [0]]), repid_offsets_in[:, :-1]], dim=1
         ).long()
         cg_tilde, repids_in1, repids_in2, repids_out = [], [], [], []
-        max_l = metadata_in.shape[1]
+        max_l = metadata_in.shape[1] - 1
         # Tabulate the output metadata and allowed coupling terms
         valid_coupling_ids = []
         metadata_out = torch.zeros_like(max_n_out)
-        for lout in range(max_l):
-            for lin1 in range(max_l):
-                for lin2 in range(max_l):
+        for lout in range(max_l + 1):
+            for lin1 in range(max_l + 1):
+                for lin2 in range(max_l + 1):
                     if lin1 + lin2 < lout or abs(lin1 - lin2) > lout:
                         continue
                     if trunc_in:
@@ -274,10 +276,18 @@ class CGCoupler(torch.nn.Module):
             if not overlap_out:
                 out_ns_offset += degeneracy
 
-        self.cg_tilde = torch.nn.Parameter(torch.cat(cg_tilde).type(self.dtype), requires_grad=False)
-        self.repids_in1 = torch.nn.Parameter(torch.cat(repids_in1).long(), requires_grad=False)
-        self.repids_in2 = torch.nn.Parameter(torch.cat(repids_in2).long(), requires_grad=False)
-        self.repids_out = torch.nn.Parameter(torch.cat(repids_out).long(), requires_grad=False)
+        self.cg_tilde = torch.nn.Parameter(
+            torch.cat(cg_tilde).type(self.dtype), requires_grad=False
+        )
+        self.repids_in1 = torch.nn.Parameter(
+            torch.cat(repids_in1).long(), requires_grad=False
+        )
+        self.repids_in2 = torch.nn.Parameter(
+            torch.cat(repids_in2).long(), requires_grad=False
+        )
+        self.repids_out = torch.nn.Parameter(
+            torch.cat(repids_out).long(), requires_grad=False
+        )
         # Do not transfer metadata to device
         self.metadata_out = metadata_out
 

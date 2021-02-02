@@ -1,1 +1,1 @@
-from torch_gauge.o3 import spherical, functional
+from torch_gauge.o3.spherical import SphericalTensor

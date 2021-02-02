@@ -5,7 +5,7 @@ Test training a minimal SO(3) model on synthetic data
 import torch
 
 from torch_gauge.nn import IELin, RepNorm1d, Swish
-from torch_gauge.o3.spherical import SphericalTensor
+from torch_gauge.o3 import SphericalTensor
 
 
 class mini2d(torch.nn.Module):

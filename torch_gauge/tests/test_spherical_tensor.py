@@ -1,6 +1,6 @@
 import torch
 
-from torch_gauge.o3.spherical import SphericalTensor
+from torch_gauge.o3 import SphericalTensor
 
 
 def test_spherical_tensor_creation1d():

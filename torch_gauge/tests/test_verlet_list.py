@@ -1,6 +1,6 @@
 import torch
 
-from torch_gauge.verlet_list import VerletList
+from torch_gauge import VerletList
 
 
 # The i-j inversion should return a transposed matrix when the graph is dense
