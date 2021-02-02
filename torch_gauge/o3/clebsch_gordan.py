@@ -166,18 +166,23 @@ class CGCoupler(torch.nn.Module):
         metadata_1 (torch.LongTensor): The representation metadata of the first tensor to be coupled.
         metadata_2 (torch.LongTensor): The representation metadata of the second tensor to be coupled,
              must have the same length (number of l's) as ``metadata_1``.
+        parity (int): The parity to be retained in coupling. 0: No parity selection; 1: Polar tensor; -1: Pseudo tensor.
         overlap_out (bool): If true, the coupling outputs from the same input feature index but different (l1, l2)s
              will be accumulated to the same representation index of the output SphericalTensor.
         trunc_in (bool): If true, the allowed feature indices (n) will be further truncated such that for
              each set of terms (l1, l2, n), the coupling results will saturate all possible (l_out, n) values
              of the output SphericalTensor.
         dtype (torch.dtype): The dtype for tensor to be passed in coupling, must be specified beforehand.
+
+    Warning:
+        When using overlap_out, the parity of the system may not be conserved.
     """
 
     def __init__(
         self,
         metadata_1: torch.LongTensor,
         metadata_2: torch.LongTensor,
+        parity=0,
         overlap_out=True,
         trunc_in=True,
         dtype=torch.float,
@@ -191,6 +196,7 @@ class CGCoupler(torch.nn.Module):
         self.metadata_out = None
         self.metadata_in1 = metadata_1
         self.metadata_in2 = metadata_2
+        self.parity = parity
         self.dtype = dtype
         self._init_params(overlap_out, trunc_in)
         self.out_layout = SphericalTensor.generate_rep_layout_1d_(self.metadata_out)
@@ -213,6 +219,10 @@ class CGCoupler(torch.nn.Module):
         for lout in range(max_l + 1):
             for lin1 in range(max_l + 1):
                 for lin2 in range(max_l + 1):
+                    coupling_parity = (-1) ** (lout + lin1 + lin2)
+                    if not self.parity == 0:
+                        if self.parity != coupling_parity:
+                            continue
                     if lin1 + lin2 < lout or abs(lin1 - lin2) > lout:
                         continue
                     if trunc_in:

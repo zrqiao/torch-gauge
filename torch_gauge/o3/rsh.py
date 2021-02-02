@@ -126,6 +126,6 @@ class RSHxyz(torch.nn.Module):
         out = out.view(*in_shape[:-1], self.ns_lms.shape[0])
         return SphericalTensor(
             out,
-            rep_dims=(out.dim(),),
+            rep_dims=(out.dim() - 1,),
             metadata=torch.ones((1, self.max_l + 1), dtype=torch.long),
         ).to(xyz.device)

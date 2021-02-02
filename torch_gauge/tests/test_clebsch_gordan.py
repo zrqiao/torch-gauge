@@ -242,3 +242,48 @@ def test_cg_coupling_equivariance4():
     assert torch.allclose(rot_out4.ten, out4_rot.ten, atol=1e-5, rtol=1e-5), print(
         (out4_rot.ten - rot_out4.ten).flatten().abs()
     )
+
+
+def test_cg_coupling_parity_equivariance_polar():
+    # Polar tensor, improper rotation
+    coupler = CGCoupler(
+        metadata1[0], metadata2[0], parity=1, overlap_out=False, trunc_in=False
+    )
+    out: SphericalTensor = coupler(spten1, spten2)
+    assert torch.all(
+        out.metadata.eq(torch.LongTensor([[253, 283, 241, 175, 117, 71, 34, 19, 16]]))
+    )
+    out_rot = real_wigner_rot(out, alpha, beta, gamma)
+    # Condon-Shortley phase upon inversion
+    out_rot.ten *= torch.pow(-1, out_rot.rep_layout[0][0])
+
+    spten1_rot = real_wigner_rot(spten1, alpha, beta, gamma)
+    spten1_rot.ten *= torch.pow(-1, spten1_rot.rep_layout[0][0])
+    spten2_rot = real_wigner_rot(spten2, alpha, beta, gamma)
+    spten2_rot.ten *= torch.pow(-1, spten2_rot.rep_layout[0][0])
+    rot_out = coupler(spten1_rot, spten2_rot)
+    assert torch.allclose(rot_out.ten, out_rot.ten, atol=1e-5, rtol=1e-5), print(
+        (out_rot.ten - rot_out.ten).flatten().abs()
+    )
+
+
+def test_cg_coupling_parity_equivariance_pseudo():
+    # Pseudo tensor, improper rotation
+    coupler = CGCoupler(
+        metadata1[0], metadata2[0], parity=-1, overlap_out=False, trunc_in=False
+    )
+    out: SphericalTensor = coupler(spten1, spten2)
+    out_rot = real_wigner_rot(out, alpha, beta, gamma)
+    assert torch.all(
+        out.metadata.eq(torch.LongTensor([[0, 125, 139, 117, 83, 53, 26, 15, 12]]))
+    )
+    out_rot.ten *= torch.pow(-1, out_rot.rep_layout[0][0])
+
+    spten1_rot = real_wigner_rot(spten1, alpha, beta, gamma)
+    spten1_rot.ten *= torch.pow(-1, spten1_rot.rep_layout[0][0])
+    spten2_rot = real_wigner_rot(spten2, alpha, beta, gamma)
+    spten2_rot.ten *= torch.pow(-1, spten2_rot.rep_layout[0][0])
+    rot_out = coupler(spten1_rot, spten2_rot)
+    assert torch.allclose(rot_out.ten.neg(), out_rot.ten, atol=1e-5, rtol=1e-5), print(
+        (out_rot.ten - rot_out.ten).flatten().abs()
+    )

@@ -216,3 +216,19 @@ def test_wigner_rsh_rotation():
     assert torch.allclose(rsh_rot, wigner_rot_rshs, atol=1e-6), print(
         rsh_rot, wigner_rot_rshs
     )
+
+
+def test_rsh_inversion():
+    # Tight checking up to l=10
+    rshmodule = RSHxyz(max_l=10)
+    xyz = torch.normal(0, 1, size=(1, 3), dtype=torch.double)
+    xyz /= xyz.norm(dim=1).unsqueeze(1)
+
+    inv_xyz = xyz.neg()
+
+    rsh_pre = rshmodule(xyz)
+    rsh_inv = rshmodule(inv_xyz).ten
+
+    # Condon-Shortley phase upon inversion
+    cs_rshs = rsh_pre.ten.mul(torch.pow(-1, rsh_pre.rep_layout[0][0]))
+    assert torch.allclose(rsh_inv, cs_rshs, atol=1e-8), print(cs_rshs, rsh_inv)

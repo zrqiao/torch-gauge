@@ -50,6 +50,7 @@ class SphericalTensor:
         self.ten = data_ten
         self.metadata = metadata
         self.rep_dims = rep_dims
+        assert self.rep_dims[-1] < self.ten.dim()
         self._norm_eps = 1e-4
         if rep_layout:
             self.rep_layout = rep_layout
@@ -384,5 +385,5 @@ class SphericalTensor:
         # Do not transfer metadata to GPU, as index tracking should be more efficient
         # on CPUs
         self.ten = self.ten.to(device)
-        self.rep_layout = (layout.to(device) for layout in self.rep_layout)
+        self.rep_layout = tuple(layout.to(device) for layout in self.rep_layout)
         return self
