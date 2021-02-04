@@ -197,9 +197,9 @@ def test_train_cuda_mini2d_o3():
     rs_1d = x_1d.ten.view(128, 23, 4)
     labels = torch.sin(
         (x_2d.ten * rs_1d.unsqueeze(1) * rs_1d.unsqueeze(2))
-            .pow(2)
-            .mean(dim=(1, 2))
-            .sqrt()
+        .pow(2)
+        .mean(dim=(1, 2))
+        .sqrt()
     ).sum(1)
 
     mods = torch.nn.ModuleList(
