@@ -12,6 +12,8 @@ from torch_gauge.o3.clebsch_gordan import (
 )
 from torch_gauge.o3.wigner import wigner_D_rsh
 
+torch.manual_seed(42)
+
 
 def test_generate_cg_csh():
     max_j = 4
@@ -108,27 +110,30 @@ def test_cg_selection_rule():
     coupler3 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=True)
     coupler4 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=True)
 
-    # With benchmarking
     coupling_out = coupler1(spten1, spten2)
     assert torch.all(
         coupling_out.metadata.eq(torch.LongTensor([[128, 80, 40, 20, 10, 5, 2, 1, 1]]))
     )
+    assert not torch.any(coupling_out.ten == 0)
     coupling_out = coupler2(spten1, spten2)
     assert torch.all(
         coupling_out.metadata.eq(
             torch.LongTensor([[253, 408, 380, 292, 200, 124, 60, 34, 28]])
         )
     )
+    assert not torch.any(coupling_out.ten == 0)
     coupling_out = coupler3(spten1, spten2)
     assert torch.all(
         coupling_out.metadata.eq(
             torch.LongTensor([[181, 249, 203, 139, 87, 50, 25, 13, 7]])
         )
     )
+    assert not torch.any(coupling_out.ten == 0)
     coupling_out = coupler4(spten1, spten2)
     assert torch.all(
         coupling_out.metadata.eq(torch.LongTensor([[128, 80, 40, 20, 10, 5, 2, 1, 1]]))
     )
+    assert not torch.any(coupling_out.ten == 0)
 
 
 metadata1 = torch.LongTensor([[128, 64, 32, 16, 8, 4, 2, 1, 1]])

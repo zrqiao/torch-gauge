@@ -15,7 +15,7 @@ from scipy.special import factorial
 
 from torch_gauge import ROOT_DIR
 
-memory = Memory(os.path.join(ROOT_DIR, ".o3_cache"), verbose=0)
+memory = Memory(os.path.join(ROOT_DIR, ".o3_cache"), verbose=0, bytes_limit=200000)
 
 
 @memory.cache

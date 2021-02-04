@@ -5,6 +5,8 @@ Testing real spherical harmonics generation
 import math
 import random
 
+random.seed(42)
+
 import torch
 
 from torch_gauge.geometric import rotation_matrix_xyz
@@ -213,7 +215,7 @@ def test_wigner_rsh_rotation():
         wigner_rot_rshs.append(rsh_pre[:, l ** 2 : (l + 1) ** 2].mm(real_wigner_l))
 
     wigner_rot_rshs = torch.cat(wigner_rot_rshs, dim=1)
-    assert torch.allclose(rsh_rot, wigner_rot_rshs, atol=1e-6), print(
+    assert torch.allclose(rsh_rot, wigner_rot_rshs, atol=1e-6, rtol=1e-6), print(
         rsh_rot, wigner_rot_rshs
     )
 

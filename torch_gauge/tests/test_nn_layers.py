@@ -12,7 +12,9 @@ def test_IELin_forward_1d():
     metadata = torch.LongTensor([[8, 4, 2, 4, 1]])
     test_sp_ten = SphericalTensor(torch.rand(4, 6, 12, 67), (3,), metadata)
     ielin_dense = IELin(
-        torch.LongTensor([8, 4, 2, 4, 1]), torch.LongTensor([2, 3, 4, 5, 6])
+        torch.LongTensor([8, 4, 2, 4, 1]),
+        torch.LongTensor([2, 3, 4, 5, 6]),
+        group="so3",
     )
     dense_out = ielin_dense(test_sp_ten)
     assert dense_out.ten.shape == (4, 6, 12, 120)
@@ -20,7 +22,9 @@ def test_IELin_forward_1d():
     assert torch.all(dense_out.metadata.eq(torch.LongTensor([[2, 3, 4, 5, 6]])))
 
     ielin_dropped = IELin(
-        torch.LongTensor([8, 4, 2, 4, 1]), torch.LongTensor([2, 0, 1, 3, 0])
+        torch.LongTensor([8, 4, 2, 4, 1]),
+        torch.LongTensor([2, 0, 1, 3, 0]),
+        group="so3",
     )
     dropped_out = ielin_dropped(test_sp_ten)
     assert dropped_out.ten.shape == (4, 6, 12, 28)
@@ -33,7 +37,9 @@ def test_IELin_backward_1d():
     test_sp_ten = SphericalTensor(torch.rand(4, 6, 12, 67), (3,), metadata)
     test_sp_ten.ten.requires_grad = True
     ielin_dense = IELin(
-        torch.LongTensor([8, 4, 2, 4, 1]), torch.LongTensor([2, 3, 4, 5, 6])
+        torch.LongTensor([8, 4, 2, 4, 1]),
+        torch.LongTensor([2, 3, 4, 5, 6]),
+        group="so3",
     )
     dense_out = ielin_dense(test_sp_ten)
     pseudo_loss = dense_out.ten.pow(2).sum()
@@ -41,7 +47,9 @@ def test_IELin_backward_1d():
     assert torch.all(grad_ten[0].abs().bool())
 
     ielin_dropped = IELin(
-        torch.LongTensor([8, 4, 2, 4, 1]), torch.LongTensor([2, 0, 1, 3, 0])
+        torch.LongTensor([8, 4, 2, 4, 1]),
+        torch.LongTensor([2, 0, 1, 3, 0]),
+        group="so3",
     )
     dropped_out = ielin_dropped(test_sp_ten)
     pseudo_loss = dropped_out.ten.pow(2).sum()
@@ -84,7 +92,9 @@ def test_IELin_forward_2d():
         metadata,
     )
     ielin_dense = IELin(
-        torch.LongTensor([8, 4, 2, 4, 1]), torch.LongTensor([2, 3, 4, 5, 6])
+        torch.LongTensor([8, 4, 2, 4, 1]),
+        torch.LongTensor([2, 3, 4, 5, 6]),
+        group="so3",
     )
     out1 = ielin_dense(test_sp_ten)
     assert out1.ten.shape == (4, 6, 12, 67, 120)
@@ -119,7 +129,9 @@ def test_IELin_backward_2d():
     )
     test_sp_ten.ten.requires_grad = True
     ielin_dense = IELin(
-        torch.LongTensor([8, 4, 2, 4, 1]), torch.LongTensor([2, 3, 4, 5, 6])
+        torch.LongTensor([8, 4, 2, 4, 1]),
+        torch.LongTensor([2, 3, 4, 5, 6]),
+        group="so3",
     )
     out1 = ielin_dense(test_sp_ten)
     out2 = ielin_dense(out1.transpose_repdims(inplace=True))
@@ -159,7 +171,9 @@ def test_RepNorm1d_forward():
     activation = torch.nn.Tanh()
     norm_linear = torch.nn.Linear(19, 20)
     gauge_linear = IELin(
-        torch.LongTensor([8, 4, 2, 4, 1]), torch.LongTensor([2, 3, 4, 5, 6])
+        torch.LongTensor([8, 4, 2, 4, 1]),
+        torch.LongTensor([2, 3, 4, 5, 6]),
+        group="so3",
     )
     repnorm = RepNorm1d(19)
 
@@ -176,7 +190,9 @@ def test_RepNorm1d_backward():
     activation = torch.nn.Tanh()
     norm_linear = torch.nn.Linear(19, 20)
     gauge_linear = IELin(
-        torch.LongTensor([8, 4, 2, 4, 1]), torch.LongTensor([2, 3, 4, 5, 6])
+        torch.LongTensor([8, 4, 2, 4, 1]),
+        torch.LongTensor([2, 3, 4, 5, 6]),
+        group="so3",
     )
     repnorm = RepNorm1d(19)
 

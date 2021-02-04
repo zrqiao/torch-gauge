@@ -253,6 +253,6 @@ def test_spherical_tensor_fold_dim():
     except AssertionError as e:
         assert (
             str(e)
-            == f"The number of channels for theSphericalTensor to be folded must be multiples of "
+            == f"The number of channels for the SphericalTensor to be folded must be multiples of "
             "stride, got (tensor([[8, 4, 2, 3, 1]]), 2) instead"
         )

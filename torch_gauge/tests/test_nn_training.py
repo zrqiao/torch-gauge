@@ -11,7 +11,7 @@ from torch_gauge.o3 import SphericalTensor
 class mini2d(torch.nn.Module):
     def __init__(self, metadata, n_channels):
         super().__init__()
-        self.onebody_ielin = IELin(metadata, metadata)
+        self.onebody_ielin = IELin(metadata, metadata, group="so3")
         self.onebody_mlp = torch.nn.Sequential(
             torch.nn.Linear(n_channels, n_channels),
             Swish(),

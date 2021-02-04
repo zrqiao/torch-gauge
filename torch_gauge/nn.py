@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn.functional as F
 
-from torch_gauge.o3.spherical import SphericalTensor
+from torch_gauge.o3 import SphericalTensor
 
 
 class SSP(torch.nn.Softplus):
@@ -70,15 +70,23 @@ class IELin(torch.nn.Module):
             for each l (and the associated m(s)).
         metadata_out (torch.LongTensor): the number of non-degenerate feature channels of the output tensor
             for each l (and the associated m(s)).
+        group (str): The group index of the tensors to be passed.
     """
 
-    def __init__(self, metadata_in, metadata_out):
+    def __init__(self, metadata_in, metadata_out, group="o3"):
         super().__init__()
         assert metadata_in.dim() == 1
         assert len(metadata_in) == len(metadata_out)
         self._metadata_in = metadata_in
         self._metadata_out = metadata_out
-        n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0)) * 2 + 1
+        group = group.lower()
+        if group == "so3":
+            n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0)) * 2 + 1
+        elif group == "o3":
+            n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0) // 2) * 2 + 1
+            n_irreps_per_l = n_irreps_per_l.repeat_interleave(2)
+        else:
+            raise NotImplementedError(f"The group {group} is not supported in IELin")
         # The bias must be False
         self.linears = torch.nn.ModuleList(
             [
