@@ -2,6 +2,7 @@
 Test training a minimal SO(3) model on synthetic data
 """
 
+import pytest
 import torch
 
 from torch_gauge.nn import IELin, RepNorm1d, Swish
@@ -43,7 +44,7 @@ class mini2d_so3(torch.nn.Module):
         return x_1d_new, x_2d_new
 
 
-def test_train_mini2d_so3():
+def test_train_cpu_mini2d_so3():
     torch.manual_seed(42)
     metadata1d = torch.LongTensor([[12, 4, 8, 4, 4]])
     metadata2d = torch.LongTensor([[3, 1, 2, 1, 1], [3, 1, 2, 1, 1]])
@@ -133,7 +134,7 @@ class mini2d_o3(torch.nn.Module):
         return x_1d_new, x_2d_new
 
 
-def test_train_mini2d_o3():
+def test_train_cpu_mini2d_o3():
     torch.manual_seed(42)
     metadata1d = torch.LongTensor([[12, 4, 8, 4, 4, 4]])
     metadata2d = torch.LongTensor([[3, 1, 2, 1, 1, 1], [3, 1, 2, 1, 1, 1]])
@@ -183,5 +184,54 @@ def test_train_mini2d_o3():
     assert epoch_mae / 4 < 0.1
 
 
-if __name__ == "__main__":
-    test_train_mini2d_so3()
+def test_train_cuda_mini2d_o3():
+    if not torch.cuda.is_available():
+        pytest.skip()
+    device = torch.device("cuda")
+    torch.manual_seed(42)
+    metadata1d = torch.LongTensor([[12, 4, 8, 4, 4, 4]])
+    metadata2d = torch.LongTensor([[3, 1, 2, 1, 1, 1], [3, 1, 2, 1, 1, 1]])
+    x_1d = O3Tensor(torch.rand(128, 92), (1,), metadata1d).to(device)
+    x_2d = O3Tensor(torch.rand(128, 23, 23, 4), (1, 2), metadata2d).to(device)
+    # Create synthetic labels
+    rs_1d = x_1d.ten.view(128, 23, 4)
+    labels = torch.sin(
+        (x_2d.ten * rs_1d.unsqueeze(1) * rs_1d.unsqueeze(2))
+            .pow(2)
+            .mean(dim=(1, 2))
+            .sqrt()
+    ).sum(1)
+
+    mods = torch.nn.ModuleList(
+        [
+            mini2d_o3(torch.LongTensor([12, 4, 8, 4, 4, 4]), 36),
+            mini2d_o3(torch.LongTensor([12, 4, 8, 4, 4, 4]), 36),
+            mini2d_o3(torch.LongTensor([12, 4, 8, 4, 4, 4]), 36),
+        ]
+    ).to(device)
+
+    loss_fn = torch.nn.MSELoss()
+    mae_fn = torch.nn.L1Loss()
+    optimizer = torch.optim.Adam(mods.parameters(), lr=1e-3)
+
+    loss, epoch_mae = 0.0, 0.0
+    for epoch in range(50):
+        epoch_mae = 0.0
+        for iter in range(4):
+            batch_idx = torch.randint(128, (32,))
+            batch_label = labels[batch_idx]
+            x_1d_new = x_1d.self_like(x_1d.ten[batch_idx])
+            x_2d_new = x_2d.self_like(x_2d.ten[batch_idx])
+            for mod in mods:
+                x_1d_new, x_2d_new = mod(x_1d_new, x_2d_new)
+            out = x_2d_new.invariant().sum(dim=(1, 2, 3))
+            optimizer.zero_grad()
+            loss = loss_fn(out, batch_label)
+            mae = mae_fn(out, batch_label)
+            loss.backward()
+            optimizer.step()
+            epoch_mae += mae.cpu().item()
+        print(f"Epoch: {epoch+1}, Loss: {loss.cpu().item()}, MAE: {epoch_mae/4}")
+
+    assert loss < 0.01
+    assert epoch_mae / 4 < 0.1
