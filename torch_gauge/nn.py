@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn.functional as F
 
-from torch_gauge.o3 import SphericalTensor
+from torch_gauge.o3 import O3Tensor, SphericalTensor
 
 
 class SSP(torch.nn.Softplus):
@@ -42,7 +42,7 @@ class Swish(torch.nn.Module):
 
 
 class IELin(torch.nn.Module):
-    """
+    r"""
     Irrep-wise Equivariant Linear Layer.
 
     This module takes a spherical tensor and perform linear transformation within
@@ -81,8 +81,10 @@ class IELin(torch.nn.Module):
         self._metadata_out = metadata_out
         group = group.lower()
         if group == "so3":
+            self.tensor_class = SphericalTensor
             n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0)) * 2 + 1
         elif group == "o3":
+            self.tensor_class = O3Tensor
             n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0) // 2) * 2 + 1
             n_irreps_per_l = n_irreps_per_l.repeat_interleave(2)
         else:
@@ -102,7 +104,7 @@ class IELin(torch.nn.Module):
         )
         self._end_inds_in = torch.cumsum(self._metadata_in * n_irreps_per_l, dim=0)
         self._start_inds_in = torch.cat([torch.LongTensor([0]), self._end_inds_in[:-1]])
-        self.out_layout = SphericalTensor.generate_rep_layout_1d_(self._metadata_out)
+        self.out_layout = self.tensor_class.generate_rep_layout_1d_(self._metadata_out)
         self.num_out_channels = torch.sum(self._metadata_out).item()
 
     def forward(self, x: SphericalTensor) -> SphericalTensor:
@@ -133,7 +135,7 @@ class IELin(torch.nn.Module):
         out_metadata = x.metadata.clone()
         out_metadata[-1] = self._metadata_out
         out_rep_layout = x.rep_layout[:-1] + (self.out_layout,)
-        return SphericalTensor(
+        return self.tensor_class(
             out_ten,
             rep_dims=x.rep_dims,
             metadata=out_metadata,
@@ -143,7 +145,7 @@ class IELin(torch.nn.Module):
 
 
 class RepNorm1d(torch.nn.Module):
-    """
+    r"""
     The (experimental) Representation Normalization layer.
 
     .. math::
