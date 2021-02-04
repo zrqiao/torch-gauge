@@ -67,6 +67,10 @@ class SphericalTensor:
     def shape(self):
         return self.ten.shape
 
+    @property
+    def device(self):
+        return self.ten.device
+
     def self_like(self, new_data_ten: torch.Tensor):
         """
         Args:

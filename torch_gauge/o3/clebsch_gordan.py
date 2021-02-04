@@ -199,7 +199,7 @@ class CGCoupler(torch.nn.Module):
         self.parity = parity
         self.dtype = dtype
         self._init_params(overlap_out, trunc_in)
-        self.out_layout = SphericalTensor.generate_rep_layout_1d_(self.metadata_out)
+        self.out_layout = torch.nn.Parameter(SphericalTensor.generate_rep_layout_1d_(self.metadata_out), requires_grad=False)
 
     def _init_params(self, overlap_out, trunc_in):
         metadata_in = torch.stack([self.metadata_in1, self.metadata_in2], dim=0)
@@ -391,7 +391,7 @@ class CGPCoupler(torch.nn.Module):
         self.metadata_in2 = metadata_2
         self.dtype = dtype
         self._init_params(trunc_in)
-        self.out_layout = O3Tensor.generate_rep_layout_1d_(self.metadata_out)
+        self.out_layout = torch.nn.Parameter(O3Tensor.generate_rep_layout_1d_(self.metadata_out), requires_grad=False)
 
     def _init_params(self, trunc_in):
         metadata_in = torch.stack([self.metadata_in1, self.metadata_in2], dim=0)
