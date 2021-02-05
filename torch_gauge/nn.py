@@ -137,7 +137,7 @@ class IELin(torch.nn.Module):
         out_ten = torch.cat(outs, dim=-1)
         out_metadata = x.metadata.clone()
         out_metadata[-1] = self._metadata_out
-        out_rep_layout = x.rep_layout[:-1] + (self.out_layout,)
+        out_rep_layout = x.rep_layout[:-1] + (self.out_layout.data,)
         return self.tensor_class(
             out_ten,
             rep_dims=x.rep_dims,

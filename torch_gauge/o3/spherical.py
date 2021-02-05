@@ -161,7 +161,7 @@ class SphericalTensor:
         elif len(self.rep_dims) == 2:
             dimid_kept = 1 - dotdim_idx
             assert other.ten.shape[self.rep_dims[dimid_kept]] == 1
-            return SphericalTensor(
+            return self.__class__(
                 out_ten,
                 rep_dims=(self.rep_dims[dimid_kept],),
                 metadata=self.metadata[dimid_kept].unsqueeze(0),
@@ -203,7 +203,7 @@ class SphericalTensor:
         elif len(self.rep_dims) == 2:
             # A little trick here
             dimid_kept = 1 - dotdim_idx
-            return SphericalTensor(
+            return self.__class__(
                 out_ten,
                 rep_dims=(self.rep_dims[dimid_kept],),
                 metadata=self.metadata[dimid_kept].unsqueeze(0),
@@ -231,7 +231,7 @@ class SphericalTensor:
             self.rep_layout[0],
             other.rep_layout[0],
         )
-        return SphericalTensor(
+        return self.__class__(
             out_ten,
             rep_dims=(odim, odim + 1),
             metadata=out_metadata,
@@ -262,7 +262,7 @@ class SphericalTensor:
             self.num_channels = new_num_channels
             return self
         else:
-            return SphericalTensor(
+            return self.__class__(
                 new_ten,
                 rep_dims=self.rep_dims,
                 metadata=new_metadata,
@@ -287,7 +287,7 @@ class SphericalTensor:
             self.num_channels = num_channels_t
             return self
         else:
-            return SphericalTensor(
+            return self.__class__(
                 ten_t,
                 rep_dims=dims_t,
                 metadata=metadata_t,
@@ -461,161 +461,6 @@ class O3Tensor(SphericalTensor):
             rep_layout=self.rep_layout,
             num_channels=self.num_channels,
         )
-
-    def dot(self, other: "O3Tensor", dim: int):
-        """
-        Performing inner product along a representation dimension.
-
-        If self.n_rep_dim==1, a torch.Tensor is returned;
-        if self.n_rep_dim==2, a SphericalTensor with n_rep_dim==1 is returned.
-
-        Args:
-            other (O3Tensor): Must be a 1-d spherical tensor
-                with the same number of dimensions and broadcastable to self.ten.
-                When self.n_rep_dim==2, the kept dimension in self.rep_dims
-                of other must be singleton.
-            dim (int): The dimension to perform the inner product.
-        """
-        dotdim_idx = self.rep_dims.index(dim)
-        assert other.rep_dims[0] == dim
-        assert torch.all(self.metadata[dotdim_idx].eq(other.metadata[0]))
-        out_ten = self.ten.mul(other.ten).sum(dim)
-        if len(self.rep_dims) == 1:
-            return out_ten
-        elif len(self.rep_dims) == 2:
-            dimid_kept = 1 - dotdim_idx
-            assert other.ten.shape[self.rep_dims[dimid_kept]] == 1
-            return O3Tensor(
-                out_ten,
-                rep_dims=(self.rep_dims[dimid_kept],),
-                metadata=self.metadata[dimid_kept].unsqueeze(0),
-                rep_layout=(self.rep_layout[dimid_kept],),
-                num_channels=(self.num_channels[dimid_kept],),
-            )
-        else:
-            raise NotImplementedError
-
-    def rep_dot(self, other: "O3Tensor", dim: int):
-        """
-        Performing channel-wise inner products.
-
-        If self.n_rep_dim==1, a torch.Tensor is returned;
-        if self.n_rep_dim==2, a SphericalTensor with n_rep_dim==1 is returned.
-
-        Args:
-            other (SphericalTensor): must be a 1-d spherical tensor
-                with the same number of dimensions and broadcastable to self.ten.
-            dim (int): the dimension to perform the channel-wise inner product.
-        """
-        dotdim_idx = self.rep_dims.index(dim)
-        assert other.rep_dims[0] == dim
-        assert torch.all(self.metadata[dotdim_idx].eq(other.metadata[0]))
-        mul_ten = self.ten * other.ten
-        out_shape = list(mul_ten.shape)
-        out_shape[dim] = self.num_channels[dotdim_idx]
-        out_ten = torch.zeros(
-            out_shape, device=mul_ten.device, dtype=mul_ten.dtype
-        ).index_add_(
-            dim,
-            self.rep_layout[dotdim_idx][2, :],
-            mul_ten,
-        )
-        # Note that the argument names of index_add in pytorch is changing from tensor to source
-        # in 1.7-1.8. Not using keywords for compatibility
-        if len(self.rep_dims) == 1:
-            return out_ten
-        elif len(self.rep_dims) == 2:
-            # A little trick here
-            dimid_kept = 1 - dotdim_idx
-            return O3Tensor(
-                out_ten,
-                rep_dims=(self.rep_dims[dimid_kept],),
-                metadata=self.metadata[dimid_kept].unsqueeze(0),
-                rep_layout=(self.rep_layout[dimid_kept],),
-                num_channels=(self.num_channels[dimid_kept],),
-            )
-        else:
-            raise NotImplementedError
-
-    def rep_outer(self, other: "O3Tensor") -> "O3Tensor":
-        """
-        Returns the batched outer product of two 1-d spherical tensors.
-
-        The rep_dim and metadata of self and other much be the same.
-        """
-        assert len(self.rep_dims) == 1
-        assert len(other.rep_dims) == 1
-        assert (
-            self.rep_dims[0] == other.rep_dims[0]
-        ), "The representation dimensions of self and other must be contiguous"
-        odim = self.rep_dims[0]
-        out_ten = self.ten.unsqueeze(odim + 1).mul(other.ten.unsqueeze(odim))
-        out_metadata = torch.cat([self.metadata, other.metadata], dim=0)
-        out_rep_layout = (
-            self.rep_layout[0],
-            other.rep_layout[0],
-        )
-        return O3Tensor(
-            out_ten,
-            rep_dims=(odim, odim + 1),
-            metadata=out_metadata,
-            rep_layout=out_rep_layout,
-            num_channels=(self.num_channels, other.num_channels),
-        )
-
-    def fold(self, stride: int, update_self=False) -> "O3Tensor":
-        """
-        Fold the chucked representation channels of a 1-d O3Tensor to a new dimension.
-        """
-        assert len(self.rep_dims) == 1
-        assert torch.all(torch.fmod(self.metadata[0], stride) == 0), (
-            f"The number of channels for the O3Tensor to be folded must be multiples of "
-            f"stride, got ({self.metadata}, {stride}) instead"
-        )
-        new_ten = self.ten.unflatten(
-            dim=self.rep_dims[0],
-            sizes=(self.shape[self.rep_dims[0]] // stride, stride),
-        )
-        new_metadata = self.metadata // stride
-        new_rep_layout = (self.rep_layout[0][:, ::stride],)
-        new_num_channels = (self.num_channels[0] // stride,)
-        if update_self:
-            self.ten = new_ten
-            self.metadata = new_metadata
-            self.rep_layout = new_rep_layout
-            self.num_channels = new_num_channels
-            return self
-        else:
-            return O3Tensor(
-                new_ten,
-                rep_dims=self.rep_dims,
-                metadata=new_metadata,
-                rep_layout=new_rep_layout,
-                num_channels=new_num_channels,
-            )
-
-    def transpose_repdims(self, inplace=False):
-        assert len(self.rep_dims) == 2, "transpose_repdims only supports 2d O3Tensor"
-        ten_t = torch.transpose(self.ten, *self.rep_dims).contiguous()
-        dims_t = self.rep_dims
-        metadata_t = self.metadata[(1, 0), :]
-        rep_layout_t = self.rep_layout[::-1]
-        num_channels_t = self.num_channels[::-1]
-        if inplace:
-            self.ten = ten_t
-            self.rep_dims = dims_t
-            self.metadata = metadata_t
-            self.rep_layout = rep_layout_t
-            self.num_channels = num_channels_t
-            return self
-        else:
-            return O3Tensor(
-                ten_t,
-                rep_dims=dims_t,
-                metadata=metadata_t,
-                rep_layout=rep_layout_t,
-                num_channels=num_channels_t,
-            )
 
     @staticmethod
     def generate_rep_layout_1d_(metadata1d) -> torch.LongTensor:

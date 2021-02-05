@@ -552,5 +552,5 @@ class CGPCoupler(torch.nn.Module):
             out_ten,
             rep_dims=(coupling_dim,),
             metadata=self.metadata_out.unsqueeze(0),
-            rep_layout=(self.out_layout,),
+            rep_layout=(self.out_layout.data,),
         )
