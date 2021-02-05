@@ -270,6 +270,37 @@ class SphericalTensor:
                 num_channels=new_num_channels,
             )
 
+    def unfold(self, update_self=False) -> "SphericalTensor":
+        """
+        Contract one trailing dimension into the representation dimension.
+        """
+        assert len(self.rep_dims) == 1
+        assert self.ten.dim() > len(self.rep_dims[0]), (
+            "No trailing dimension to unfold"
+        )
+        stride = self.ten.shape[self.rep_dims[0]+1]
+        new_ten = self.ten.flatten(
+            self.rep_dims[0],
+            self.rep_dims[0]+1,
+        )
+        new_metadata = self.metadata * stride
+        new_rep_layout = (self.rep_layout[0].repeat_interleave(stride),)
+        new_num_channels = (self.num_channels[0] * stride,)
+        if update_self:
+            self.ten = new_ten
+            self.metadata = new_metadata
+            self.rep_layout = new_rep_layout
+            self.num_channels = new_num_channels
+            return self
+        else:
+            return self.__class__(
+                new_ten,
+                rep_dims=self.rep_dims,
+                metadata=new_metadata,
+                rep_layout=new_rep_layout,
+                num_channels=new_num_channels,
+            )
+
     def transpose_repdims(self, inplace=False):
         assert (
             len(self.rep_dims) == 2
