@@ -216,13 +216,7 @@ class VerletList:
                 )
                 .view(self.n_nodes, self.PADSIZE, *edata.shape[2:])
             )
-            return SphericalTensor(
-                out_ten,
-                rep_dims=edata.rep_dims,
-                metadata=edata.metadata,
-                rep_layout=edata.rep_layout,
-                num_channels=edata.num_channels,
-            )
+            return edata.self_like(out_ten)
 
     def query_src(self, src_feat):
         """
@@ -251,7 +245,7 @@ class VerletList:
                 .view(*self.neighbor_idx.shape, flattened2d_src.shape[1])
                 .mul_(self.edge_mask.unsqueeze(2))
             )
-            return SphericalTensor(
+            return src_feat.__class__(
                 flattened_out.view(*self.neighbor_idx.shape, *src_feat.shape[1:]),
                 rep_dims=tuple(dim + 1 for dim in src_feat.rep_dims),
                 metadata=src_feat.metadata,
@@ -285,13 +279,7 @@ class VerletList:
             out_ten[scatter_ten, :] = data.ten.view(self.n_nodes, self.PADSIZE, -1)[
                 self.edge_mask, :
             ]
-            return SphericalTensor(
-                out_ten.view_as(data.ten),
-                rep_dims=data.rep_dims,
-                metadata=data.metadata,
-                rep_layout=data.rep_layout,
-                num_channels=data.num_channels,
-            )
+            return data.self_like(out_ten.view_as(data.ten))
         else:
             raise NotImplementedError
 
@@ -319,6 +307,7 @@ class VerletList:
         Warning:
             In the current version, taking batch of batched VerletLists is not supported.
         """
+        # TODO: support cat() for SphericalTensor
         batched_vl = VerletList()
         batched_vl.PADSIZE = vls[0].PADSIZE
         batched_vl.batch_num_nodes = torch.cat([vl.batch_num_nodes for vl in vls])
