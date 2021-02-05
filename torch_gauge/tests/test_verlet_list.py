@@ -1,6 +1,7 @@
 import torch
 
 from torch_gauge import VerletList
+from torch_gauge.o3 import O3Tensor
 
 
 # The i-j inversion should return a transposed matrix when the graph is dense
@@ -36,6 +37,39 @@ def test_verletlist_querysrc_dense():
     vl_test = VerletList().from_mask(mask, 17, 17, {"test_ndata": data}, {})
     src_data = vl_test.query_src(vl_test.ndata["test_ndata"])
     assert torch.all(data.unsqueeze(0).expand(17, 17, 8, 6).eq(src_data))
+
+
+def test_verletlist_o3():
+    vls = []
+    for _ in range(4):
+        dten1 = torch.rand(17, 101, 7)
+        metadata = torch.LongTensor([[3, 4, 5, 4, 1, 0, 2, 3, 2, 1]])
+        test1 = O3Tensor(dten1, (1,), metadata)
+        dten2 = torch.rand(17, 17, 101, 101, 7)
+        test2 = O3Tensor(dten2, (2, 3), metadata.repeat(2, 1))
+        mask_pre = torch.rand(17, 17)
+        mask = (mask_pre + mask_pre.t()) > 0.5
+        vl_test = VerletList().from_mask(
+            mask, 17, 17, {"test_ndata": test1}, {"test_edata": test2}
+        )
+        vls.append(vl_test)
+    batched_vls = VerletList.batch(vls)
+    assert batched_vls.ndata["test_ndata"].rep_dims == (1,)
+    assert batched_vls.ndata["test_ndata"].ten.shape == (17 * 4, 101, 7)
+    assert batched_vls.edata["test_edata"].rep_dims == (
+        2,
+        3,
+    )
+    assert batched_vls.edata["test_edata"].ten.shape == (17 * 4, 17, 101, 101, 7)
+    expanded_n = batched_vls.query_src(batched_vls.ndata["test_ndata"])
+    expanded_e = batched_vls.query_src(batched_vls.edata["test_edata"])
+    assert expanded_n.rep_dims == (2,)
+    assert expanded_n.ten.shape == (17 * 4, 17, 101, 7)
+    assert expanded_e.rep_dims == (3, 4)
+    assert expanded_e.ten.shape == (17 * 4, 17, 17, 101, 101, 7)
+    inverted_e = batched_vls.to_src_first_view(batched_vls.edata["test_edata"])
+    assert inverted_e.rep_dims == (2, 3)
+    assert inverted_e.ten.shape == (17 * 4, 17, 101, 101, 7)
 
 
 if __name__ == "__main__":

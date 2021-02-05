@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import Sequence
 
 import torch
 
@@ -297,7 +297,7 @@ class VerletList:
         return self
 
     @staticmethod
-    def batch(vls: List["VerletList"]):
+    def batch(vls: Sequence["VerletList"]):
         """
         Batching a list of VerletLists.
 
@@ -322,14 +322,27 @@ class VerletList:
             [vl.neighbor_idx for vl in vls], dim=0
         ) + bnn_offsets.unsqueeze(1)
         batched_vl.edge_mask = torch.cat([vl.edge_mask for vl in vls], dim=0)
-        batched_vl.ndata = {
-            nk: torch.cat([vl.ndata[nk] for vl in vls], dim=0)
-            for nk in vls[0].ndata.keys()
-        }
-        batched_vl.edata = {
-            ek: torch.cat([vl.edata[ek] for vl in vls], dim=0)
-            for ek in vls[0].edata.keys()
-        }
+        batched_vl.ndata = {}
+        for nk, nfeat in vls[0].ndata.items():
+            if isinstance(nfeat, SphericalTensor):
+                batched_vl.ndata[nk] = nfeat.self_like(
+                    torch.cat([vl.ndata[nk].ten for vl in vls], dim=0)
+                )
+            elif isinstance(nfeat, torch.Tensor):
+                batched_vl.ndata[nk] = torch.cat([vl.ndata[nk] for vl in vls], dim=0)
+            else:
+                raise NotImplementedError
+        batched_vl.edata = {}
+        for ek, efeat in vls[0].edata.items():
+            if isinstance(efeat, SphericalTensor):
+                batched_vl.edata[ek] = efeat.self_like(
+                    torch.cat([vl.edata[ek].ten for vl in vls], dim=0)
+                )
+            elif isinstance(efeat, torch.Tensor):
+                batched_vl.edata[ek] = torch.cat([vl.edata[ek] for vl in vls], dim=0)
+            else:
+                raise NotImplementedError
+
         batched_vl._dst_edim_locators = torch.cat(
             [vl._dst_edim_locators for vl in vls], dim=0
         )
