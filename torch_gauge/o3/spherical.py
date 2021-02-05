@@ -275,16 +275,14 @@ class SphericalTensor:
         Contract one trailing dimension into the representation dimension.
         """
         assert len(self.rep_dims) == 1
-        assert self.ten.dim() > len(self.rep_dims[0]), (
-            "No trailing dimension to unfold"
-        )
-        stride = self.ten.shape[self.rep_dims[0]+1]
+        assert self.ten.dim() > self.rep_dims[0], "No trailing dimension to unfold"
+        stride = self.ten.shape[self.rep_dims[0] + 1]
         new_ten = self.ten.flatten(
             self.rep_dims[0],
-            self.rep_dims[0]+1,
+            self.rep_dims[0] + 1,
         )
         new_metadata = self.metadata * stride
-        new_rep_layout = (self.rep_layout[0].repeat_interleave(stride),)
+        new_rep_layout = (self.rep_layout[0].repeat_interleave(stride, dim=1),)
         new_num_channels = (self.num_channels[0] * stride,)
         if update_self:
             self.ten = new_ten
