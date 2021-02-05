@@ -488,3 +488,33 @@ class O3Tensor(SphericalTensor):
         assert rep_layout.shape[1] == torch.sum(n_irreps_per_lp * metadata1d)
 
         return rep_layout
+
+    @classmethod
+    def from_so3(cls, so3_ten: SphericalTensor, parity=1):
+        metadata = so3_ten.metadata
+        if parity == 1:
+            o3_metadata = torch.stack(
+                [metadata, torch.zeros_like(metadata)], dim=2
+            ).view(metadata.shape[0], -1)
+            o3_layout = tuple(
+                torch.cat([layout, torch.ones(1, layout.shape[1])], dim=0)
+                for layout in so3_ten.rep_layout
+            )
+        elif parity == -1:
+            o3_metadata = torch.stack(
+                [torch.zeros_like(metadata), metadata], dim=2
+            ).view(metadata.shape[0], -1)
+            o3_layout = tuple(
+                torch.cat([layout, torch.ones(1, layout.shape[1]).neg()], dim=0)
+                for layout in so3_ten.rep_layout
+            )
+        else:
+            raise NotImplementedError
+
+        return O3Tensor(
+            so3_ten.ten,
+            rep_dims=so3_ten.rep_dims,
+            metadata=o3_metadata,
+            rep_layout=o3_layout,
+            num_channels=so3_ten.num_channels,
+        )

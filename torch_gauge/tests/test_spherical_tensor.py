@@ -1,6 +1,6 @@
 import torch
 
-from torch_gauge.o3 import SphericalTensor
+from torch_gauge.o3 import O3Tensor, SphericalTensor
 
 
 def test_spherical_tensor_creation1d():
@@ -256,3 +256,23 @@ def test_spherical_tensor_fold_dim():
             == f"The number of channels for the SphericalTensor to be folded must be multiples of "
             "stride, got (tensor([[8, 4, 2, 3, 1]]), 2) instead"
         )
+
+
+def test_to_o3():
+    dten1 = torch.rand(4, 6, 1, 101, 7)
+    metadata = torch.LongTensor([[7, 9, 1, 5, 3]])
+    test1 = SphericalTensor(dten1, (3,), metadata)
+    o3_ten1 = O3Tensor.from_so3(test1, parity=1)
+    assert o3_ten1.rep_dims == (3,)
+    assert torch.all(
+        o3_ten1.metadata.eq(torch.LongTensor([[7, 0, 9, 0, 1, 0, 5, 0, 3, 0]]))
+    )
+    assert torch.all(o3_ten1.rep_layout[0][3].eq(torch.ones(101, dtype=torch.long)))
+    assert torch.all(o3_ten1.rep_layout[0][:3].eq(test1.rep_layout[0]))
+    o3_ten2 = O3Tensor.from_so3(test1, parity=-1)
+    assert o3_ten2.rep_dims == (3,)
+    assert torch.all(
+        o3_ten2.metadata.eq(torch.LongTensor([[0, 7, 0, 9, 0, 1, 0, 5, 0, 3]]))
+    )
+    assert torch.all(o3_ten2.rep_layout[0][3].eq(-torch.ones(101, dtype=torch.long)))
+    assert torch.all(o3_ten2.rep_layout[0][:3].eq(test1.rep_layout[0]))
