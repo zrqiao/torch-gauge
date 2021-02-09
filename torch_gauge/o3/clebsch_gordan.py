@@ -437,10 +437,7 @@ class CGPCoupler(torch.nn.Module):
                                     degeneracy = min(
                                         metadata_in[0, lpin1],
                                         metadata_in[1, lpin2],
-                                        max(
-                                            max_n_out[2 * (lin1 + lin2)],
-                                            max_n_out[2 * (lin1 + lin2) + 1],
-                                        ),
+                                        max_n_out[2 * (lin1 + lin2) + (1 - pout)//2],
                                     )
                                 else:
                                     if lout > max_l:
@@ -448,10 +445,7 @@ class CGPCoupler(torch.nn.Module):
                                     degeneracy = min(
                                         metadata_in[0, lpin1],
                                         metadata_in[1, lpin2],
-                                        max(
-                                            max_n_out[2 * lout],
-                                            max_n_out[2 * lout + 1],
-                                        ),
+                                        max_n_out[lpout],
                                     )
                                 metadata_out[lpout] += degeneracy
                                 if degeneracy > 0:

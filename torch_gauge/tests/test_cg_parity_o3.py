@@ -19,8 +19,8 @@ def test_cgp_selection_rule():
     spten2 = O3Tensor(dten2, (3,), metadata)
     coupler2 = CGPCoupler(metadata[0], metadata[0], trunc_in=False)
     cat_out = coupler2(spten1, spten2)
-    assert cat_out.ten.shape == (4, 6, 2, 144, 7)
-    assert torch.all(cat_out.metadata.eq(torch.LongTensor([[36, 0, 24, 12]])))
+    assert cat_out.ten.shape == (4, 6, 2, 108, 7)
+    assert torch.all(cat_out.metadata.eq(torch.LongTensor([[36, 0, 24, 0]])))
     coupler3 = CGPCoupler(metadata[0], metadata[0], trunc_in=True)
     trunc_out = coupler3(spten1, spten2)
     assert trunc_out.ten.shape == (4, 6, 2, 96, 7)
@@ -35,8 +35,8 @@ def test_cgp_selection_rule():
     spten2 = O3Tensor(dten2, (3,), metadata2)
     coupler2 = CGPCoupler(metadata1[0], metadata2[0], trunc_in=False)
     cat_out = coupler2(spten1, spten2)
-    assert torch.all(cat_out.metadata.eq(torch.LongTensor([[22, 15, 29, 23]])))
-    assert cat_out.ten.shape == (4, 6, 2, 193, 7)
+    assert torch.all(cat_out.metadata.eq(torch.LongTensor([[22, 6, 29, 23]])))
+    assert cat_out.ten.shape == (4, 6, 2, 184, 7)
     coupler3 = CGPCoupler(metadata1[0], metadata2[0], trunc_in=True)
     trunc_out = coupler3(spten1, spten2)
     assert torch.all(trunc_out.metadata.eq(torch.LongTensor([[17, 3, 17, 18]])))
@@ -65,21 +65,21 @@ def test_cgp_selection_rule():
                         378,
                         283,
                         561,
-                        575,
+                        503,
                         558,
-                        551,
+                        455,
                         438,
-                        441,
+                        339,
                         306,
-                        305,
+                        219,
                         188,
-                        188,
+                        106,
                         89,
-                        90,
+                        59,
                         48,
-                        48,
+                        0,
                         37,
-                        37,
+                        0,
                     ]
                 ]
             )
@@ -93,23 +93,23 @@ def test_cgp_selection_rule():
                 [
                     [
                         290,
-                        242,
+                        196,
                         414,
-                        398,
+                        252,
                         356,
-                        356,
+                        200,
                         253,
-                        253,
+                        130,
                         160,
-                        160,
+                        75,
                         90,
-                        90,
+                        33,
                         44,
-                        44,
+                        13,
                         22,
-                        22,
+                        0,
                         11,
-                        11,
+                        0,
                     ]
                 ]
             )
