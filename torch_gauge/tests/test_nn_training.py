@@ -180,7 +180,7 @@ def test_train_cpu_mini2d_o3():
             epoch_mae += mae.item()
         print(f"Epoch: {epoch+1}, Loss: {loss}, MAE: {epoch_mae/4}")
 
-    assert loss < 0.01
+    assert loss < 0.02
     assert epoch_mae / 4 < 0.1
 
 
@@ -233,5 +233,5 @@ def test_train_cuda_mini2d_o3():
             epoch_mae += mae.cpu().item()
         print(f"Epoch: {epoch+1}, Loss: {loss.cpu().item()}, MAE: {epoch_mae/4}")
 
-    assert loss < 0.01
+    assert loss < 0.02
     assert epoch_mae / 4 < 0.1

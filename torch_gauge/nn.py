@@ -97,7 +97,7 @@ class IELin(torch.nn.Module):
                     metadata_out[l] * n_irreps_per_l[l],
                     bias=False,
                 )
-                if self._metadata_out[l] > 0
+                if self._metadata_out[l] > 0 and self._metadata_in[l] > 0
                 else None
                 for l, _ in enumerate(metadata_in)
             ]
@@ -127,6 +127,15 @@ class IELin(torch.nn.Module):
         outs = []
         for l, linear_l in enumerate(self.linears):
             if linear_l is None:
+                if self._metadata_out[l] > 0:
+                    outs.append(
+                        torch.zeros(
+                            *x.shape[:-1],
+                            self._metadata_out[l],
+                            dtype=x.ten.dtype,
+                            device=x.ten.device,
+                        )
+                    )
                 continue
             in_l = x.ten[
                 ..., self._start_inds_in[l] : self._end_inds_in[l]
@@ -160,13 +169,20 @@ class RepNorm1d(torch.nn.Module):
     information to be retained.
     """
 
-    def __init__(self, num_channels, momentum=0.1, eps=1e-2):
+    def __init__(self, num_channels, norm="batch", momentum=0.1, eps=1e-2):
         super().__init__()
         self._num_channels = num_channels
         self._eps = eps
-        self.batchnorm = torch.nn.BatchNorm1d(
-            num_features=num_channels, momentum=momentum
-        )
+        if norm == "batch":
+            self.norm = torch.nn.BatchNorm1d(
+                num_features=num_channels, momentum=momentum, affine=False
+            )
+        elif norm == "node":
+            self.norm = torch.nn.LayerNorm(
+                normalized_shape=num_channels, elementwise_affine=False
+            )
+        else:
+            raise NotImplementedError
         # TODO: initialization schemes
         self.beta = torch.nn.Parameter(torch.rand(self._num_channels))
 
@@ -183,7 +199,7 @@ class RepNorm1d(torch.nn.Module):
         """
         x0 = x.invariant()
         assert x0.dim() == 2
-        x1 = self.batchnorm(x0)
+        x1 = self.norm(x0)
         divisor = torch.abs(x0.mul(1 - self.beta) + self.beta) + self._eps
         x2 = x.scalar_mul(1 / divisor)
         return x1, x2
