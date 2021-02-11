@@ -87,8 +87,8 @@ class RSHxyz(torch.nn.Module):
 
     def _init_coefficients(self):
         dst_pointers, xyzpows, ns_lms, clmtuvs = [], [], [], []
-        for l in torch.arange(self.max_l + 1):
-            for m in torch.arange(-l, l + 1):
+        for l in torch.arange(self.max_l + 1, dtype=torch.long):
+            for m in torch.arange(-l, l + 1, dtype=torch.long):
                 ns_lm = get_ns_lm(l, m)
                 clm_tuv, xyzpowlm = get_xyzcoeff_lm(l, m)
                 dst_pointer = torch.ones_like(clm_tuv) * (l * (l + 1) + m)

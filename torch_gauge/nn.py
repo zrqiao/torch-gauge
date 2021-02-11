@@ -93,8 +93,8 @@ class IELin(torch.nn.Module):
         self.linears = torch.nn.ModuleList(
             [
                 torch.nn.Linear(
-                    metadata_in[l] * self.n_irreps_per_l[l],
-                    metadata_out[l] * self.n_irreps_per_l[l],
+                    metadata_in[l],
+                    metadata_out[l],
                     bias=False,
                 )
                 if self._metadata_out[l] > 0 and self._metadata_in[l] > 0
@@ -140,8 +140,8 @@ class IELin(torch.nn.Module):
             in_l = x.ten[
                 ..., self._start_inds_in[l] : self._end_inds_in[l]
             ].contiguous()
-            out_l = linear_l(in_l)
-            outs.append(out_l)
+            out_l = linear_l(in_l.unflatten(-1, (self.n_irreps_per_l[l], self._metadata_in[l])))
+            outs.append(out_l.view(*x.shape[:-1], self._metadata_out[l] * self.n_irreps_per_l[l]))
 
         out_ten = torch.cat(outs, dim=-1)
         out_metadata = x.metadata.clone()
@@ -162,14 +162,14 @@ class RepNorm1d(torch.nn.Module):
 
     .. math::
 
-        \mathrm{RepNorm}(\mathbf{h})_{l,m} = \\frac{\mathrm{BatchNorm}(||\mathbf{h}_l||)}{\sqrt{2l+1}}
+        \mathrm{RepNorm}(\mathbf{h})_{l,m} = \mathrm{BatchNorm}(||\mathbf{h}_l||)
         \cdot \\frac{\mathbf{h}_{l}}{ |(1-{\\beta})||\mathbf{h}_{l}|| + {\\beta}| + \\epsilon}
 
     Heuristically, the trainable :math:`\mathbf{\\beta}` controls the fraction of norm
     information to be retained.
     """
 
-    def __init__(self, num_channels, norm="batch", momentum=0.1, eps=1e-2):
+    def __init__(self, num_channels, norm="batch", momentum=0.1, eps=0.1):
         super().__init__()
         self._num_channels = num_channels
         self._eps = eps
@@ -202,4 +202,5 @@ class RepNorm1d(torch.nn.Module):
         x1 = self.norm(x0)
         divisor = torch.abs(x0.mul(1 - self.beta) + self.beta) + self._eps
         x2 = x.scalar_mul(1 / divisor)
+        # x2.ten = x2.ten.div((x.rep_layout[0][0] * 2 + 1).type(x0.dtype).sqrt().unsqueeze(0))
         return x1, x2

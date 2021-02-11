@@ -185,7 +185,7 @@ class CGCoupler(torch.nn.Module):
         parity=0,
         overlap_out=True,
         trunc_in=True,
-        dtype=torch.float,
+        dtype=torch.double,
     ):
         super().__init__()
         metadata_1 = torch.LongTensor(metadata_1)
@@ -380,7 +380,7 @@ class CGPCoupler(torch.nn.Module):
         metadata_1: torch.LongTensor,
         metadata_2: torch.LongTensor,
         trunc_in=True,
-        dtype=torch.float,
+        dtype=torch.double,
     ):
         super().__init__()
         metadata_1 = torch.LongTensor(metadata_1)
