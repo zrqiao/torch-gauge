@@ -82,19 +82,19 @@ class IELin(torch.nn.Module):
         group = group.lower()
         if group == "so3":
             self.tensor_class = SphericalTensor
-            n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0)) * 2 + 1
+            self.n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0)) * 2 + 1
         elif group == "o3":
             self.tensor_class = O3Tensor
             n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0) // 2) * 2 + 1
-            n_irreps_per_l = n_irreps_per_l.repeat_interleave(2)
+            self.n_irreps_per_l = n_irreps_per_l.repeat_interleave(2)
         else:
             raise NotImplementedError(f"The group {group} is not supported in IELin")
         # The bias must be False
         self.linears = torch.nn.ModuleList(
             [
                 torch.nn.Linear(
-                    metadata_in[l] * n_irreps_per_l[l],
-                    metadata_out[l] * n_irreps_per_l[l],
+                    metadata_in[l] * self.n_irreps_per_l[l],
+                    metadata_out[l] * self.n_irreps_per_l[l],
                     bias=False,
                 )
                 if self._metadata_out[l] > 0 and self._metadata_in[l] > 0
@@ -102,7 +102,7 @@ class IELin(torch.nn.Module):
                 for l, _ in enumerate(metadata_in)
             ]
         )
-        self._end_inds_in = torch.cumsum(self._metadata_in * n_irreps_per_l, dim=0)
+        self._end_inds_in = torch.cumsum(self._metadata_in * self.n_irreps_per_l, dim=0)
         self._start_inds_in = torch.cat([torch.LongTensor([0]), self._end_inds_in[:-1]])
         self.out_layout = torch.nn.Parameter(
             self.tensor_class.generate_rep_layout_1d_(self._metadata_out),
@@ -131,7 +131,7 @@ class IELin(torch.nn.Module):
                     outs.append(
                         torch.zeros(
                             *x.shape[:-1],
-                            self._metadata_out[l],
+                            self._metadata_out[l] * self.n_irreps_per_l[l],
                             dtype=x.ten.dtype,
                             device=x.ten.device,
                         )
