@@ -173,6 +173,8 @@ class RepNorm1d(torch.nn.Module):
 
     Heuristically, the trainable :math:`\mathbf{\\beta}` controls the fraction of norm
     information to be retained.
+
+    The specified invariant channels are not affected by the gauge factorization.
     """
 
     def __init__(
@@ -210,16 +212,27 @@ class RepNorm1d(torch.nn.Module):
         """
         x0 = x.invariant()
         assert x0.dim() == 2
+        assert self._n_invariant_channels <= x.metadata[0][0]
         x1 = self.norm(x0)
         divisor = (
-            torch.abs(
-                x0[:, self._n_invariant_channels :].mul(1 - self.beta) + self.beta
-            )
+            torch.abs(x0[:, self._n_invariant_channels :].mul(1 - self.beta).add(self.beta))
             + self._eps
         )
-        divisor = torch.cat(
-            [torch.ones_like(x0[:, : self._n_invariant_channels]), divisor], dim=1
+        divisor_broadcasted = torch.index_select(
+            divisor,
+            dim=1,
+            index=(
+                x.rep_layout[0][2, self._n_invariant_channels :]
+                - self._n_invariant_channels
+            ),
         )
-        x2 = x.scalar_mul(1 / divisor)
+        x2_ten = torch.cat(
+            [
+                torch.ones_like(x1[:, : self._n_invariant_channels]),
+                x.ten[:, self._n_invariant_channels :].div(divisor_broadcasted),
+            ],
+            dim=1,
+        )
+        x2 = x.self_like(x2_ten)
         # x2.ten = x2.ten.div((x.rep_layout[0][0] * 2 + 1).type(x0.dtype).sqrt().unsqueeze(0))
         return x1, x2
