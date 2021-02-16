@@ -12,6 +12,7 @@ from torch_gauge.o3.clebsch_gordan import (
 )
 from torch_gauge.o3.wigner import wigner_D_rsh
 
+random.seed(42)
 torch.manual_seed(42)
 
 
@@ -57,19 +58,19 @@ def test_cg_selection_rule():
     dten2 = torch.rand(4, 6, 2, 60, 7)
     spten1 = SphericalTensor(dten1, (3,), metadata)
     spten2 = SphericalTensor(dten2, (3,), metadata)
-    coupler1 = CGCoupler(metadata[0], metadata[0], overlap_out=True, trunc_in=False)
+    coupler1 = CGCoupler(metadata[0], metadata[0], overlap_out=True, trunc_in=False, dtype=torch.float)
     overlap_out = coupler1(spten1, spten2)
     assert overlap_out.ten.shape == (4, 6, 2, 60, 7)
     assert torch.all(overlap_out.metadata.eq(torch.LongTensor([[24, 12]])))
-    coupler2 = CGCoupler(metadata[0], metadata[0], overlap_out=False, trunc_in=False)
+    coupler2 = CGCoupler(metadata[0], metadata[0], overlap_out=False, trunc_in=False, dtype=torch.float)
     cat_out = coupler2(spten1, spten2)
     assert cat_out.ten.shape == (4, 6, 2, 144, 7)
     assert torch.all(cat_out.metadata.eq(torch.LongTensor([[36, 36]])))
-    coupler3 = CGCoupler(metadata[0], metadata[0], overlap_out=False, trunc_in=True)
+    coupler3 = CGCoupler(metadata[0], metadata[0], overlap_out=False, trunc_in=True, dtype=torch.float)
     trunc_out = coupler3(spten1, spten2)
     assert trunc_out.ten.shape == (4, 6, 2, 96, 7)
     assert torch.all(trunc_out.metadata.eq(torch.LongTensor([[24, 24]])))
-    coupler4 = CGCoupler(metadata[0], metadata[0], overlap_out=True, trunc_in=True)
+    coupler4 = CGCoupler(metadata[0], metadata[0], overlap_out=True, trunc_in=True, dtype=torch.float)
     trunc_overlap_out = coupler4(spten1, spten2)
     assert trunc_overlap_out.ten.shape == (4, 6, 2, 60, 7)
     assert torch.all(trunc_overlap_out.metadata.eq(torch.LongTensor([[24, 12]])))
@@ -81,19 +82,19 @@ def test_cg_selection_rule():
     dten2 = torch.rand(4, 6, 2, 80, 7)
     spten1 = SphericalTensor(dten1, (3,), metadata1)
     spten2 = SphericalTensor(dten2, (3,), metadata2)
-    coupler1 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=False)
+    coupler1 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=False, dtype=torch.float)
     overlap_out = coupler1(spten1, spten2)
     assert overlap_out.ten.shape == (4, 6, 2, 80, 7)
     assert torch.all(overlap_out.metadata.eq(torch.LongTensor([[17, 21]])))
-    coupler2 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=False)
+    coupler2 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=False, dtype=torch.float)
     cat_out = coupler2(spten1, spten2)
     assert cat_out.ten.shape == (4, 6, 2, 164, 7)
     assert torch.all(cat_out.metadata.eq(torch.LongTensor([[29, 45]])))
-    coupler3 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=True)
+    coupler3 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=True, dtype=torch.float)
     trunc_out = coupler3(spten1, spten2)
     assert trunc_out.ten.shape == (4, 6, 2, 116, 7)
     assert torch.all(trunc_out.metadata.eq(torch.LongTensor([[17, 33]])))
-    coupler4 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=True)
+    coupler4 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=True, dtype=torch.float)
     trunc_overlap_out = coupler4(spten1, spten2)
     assert trunc_overlap_out.ten.shape == (4, 6, 2, 80, 7)
     assert torch.all(trunc_overlap_out.metadata.eq(torch.LongTensor([[17, 21]])))
@@ -105,10 +106,10 @@ def test_cg_selection_rule():
     dten2 = torch.rand(8, 898)
     spten1 = SphericalTensor(dten1, (1,), metadata1)
     spten2 = SphericalTensor(dten2, (1,), metadata2)
-    coupler1 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=False)
-    coupler2 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=False)
-    coupler3 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=True)
-    coupler4 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=True)
+    coupler1 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=False, dtype=torch.float)
+    coupler2 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=False, dtype=torch.float)
+    coupler3 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=True, dtype=torch.float)
+    coupler4 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=True, dtype=torch.float)
 
     coupling_out = coupler1(spten1, spten2)
     assert torch.all(
@@ -142,10 +143,10 @@ dten1 = torch.rand(64, 766)
 dten2 = torch.rand(64, 898)
 spten1 = SphericalTensor(dten1, (1,), metadata1)
 spten2 = SphericalTensor(dten2, (1,), metadata2)
-coupler1 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=False)
-coupler2 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=False)
-coupler3 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=True)
-coupler4 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=True)
+coupler1 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=False, dtype=torch.float)
+coupler2 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=False, dtype=torch.float)
+coupler3 = CGCoupler(metadata1[0], metadata2[0], overlap_out=False, trunc_in=True, dtype=torch.float)
+coupler4 = CGCoupler(metadata1[0], metadata2[0], overlap_out=True, trunc_in=True, dtype=torch.float)
 
 
 def test_benchmark_coupler_setup1(benchmark):
@@ -252,7 +253,7 @@ def test_cg_coupling_equivariance4():
 def test_cg_coupling_parity_equivariance_polar():
     # Polar tensor, improper rotation
     coupler = CGCoupler(
-        metadata1[0], metadata2[0], parity=1, overlap_out=False, trunc_in=False
+        metadata1[0], metadata2[0], parity=1, overlap_out=False, trunc_in=False, dtype=torch.float
     )
     out: SphericalTensor = coupler(spten1, spten2)
     assert torch.all(
@@ -275,7 +276,7 @@ def test_cg_coupling_parity_equivariance_polar():
 def test_cg_coupling_parity_equivariance_pseudo():
     # Pseudo tensor, improper rotation
     coupler = CGCoupler(
-        metadata1[0], metadata2[0], parity=-1, overlap_out=False, trunc_in=False
+        metadata1[0], metadata2[0], parity=-1, overlap_out=False, trunc_in=False, dtype=torch.float
     )
     out: SphericalTensor = coupler(spten1, spten2)
     out_rot = real_wigner_rot(out, alpha, beta, gamma)

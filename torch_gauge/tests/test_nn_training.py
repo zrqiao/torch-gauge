@@ -104,7 +104,7 @@ class mini2d_o3(torch.nn.Module):
             torch.nn.Linear(n_channels, n_channels),
         )
         self.onebody_norm = RepNorm1d(num_channels=n_channels)
-        self.onebody_coupling = CGPCoupler(metadata, metadata)
+        self.onebody_coupling = CGPCoupler(metadata, metadata, dtype=torch.float)
         self.onebody_ielin2 = IELin(
             self.onebody_coupling.metadata_out, metadata, group="o3"
         )
@@ -233,5 +233,5 @@ def test_train_cuda_mini2d_o3():
             epoch_mae += mae.cpu().item()
         print(f"Epoch: {epoch+1}, Loss: {loss.cpu().item()}, MAE: {epoch_mae/4}")
 
-    assert loss < 0.02
+    assert loss < 0.01
     assert epoch_mae / 4 < 0.1

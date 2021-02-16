@@ -140,8 +140,14 @@ class IELin(torch.nn.Module):
             in_l = x.ten[
                 ..., self._start_inds_in[l] : self._end_inds_in[l]
             ].contiguous()
-            out_l = linear_l(in_l.unflatten(-1, (self.n_irreps_per_l[l], self._metadata_in[l])))
-            outs.append(out_l.view(*x.shape[:-1], self._metadata_out[l] * self.n_irreps_per_l[l]))
+            out_l = linear_l(
+                in_l.unflatten(-1, (self.n_irreps_per_l[l], self._metadata_in[l]))
+            )
+            outs.append(
+                out_l.view(
+                    *x.shape[:-1], self._metadata_out[l] * self.n_irreps_per_l[l]
+                )
+            )
 
         out_ten = torch.cat(outs, dim=-1)
         out_metadata = x.metadata.clone()
@@ -169,9 +175,12 @@ class RepNorm1d(torch.nn.Module):
     information to be retained.
     """
 
-    def __init__(self, num_channels, norm="batch", momentum=0.1, eps=0.1):
+    def __init__(
+        self, num_channels, norm="batch", momentum=0.1, eps=0.1, n_invariant_channels=0
+    ):
         super().__init__()
         self._num_channels = num_channels
+        self._n_invariant_channels = n_invariant_channels
         self._eps = eps
         if norm == "batch":
             self.norm = torch.nn.BatchNorm1d(
@@ -184,7 +193,9 @@ class RepNorm1d(torch.nn.Module):
         else:
             raise NotImplementedError
         # TODO: initialization schemes
-        self.beta = torch.nn.Parameter(torch.rand(self._num_channels))
+        self.beta = torch.nn.Parameter(
+            torch.rand(self._num_channels - self._n_invariant_channels)
+        )
 
     def forward(self, x: SphericalTensor) -> (torch.Tensor, SphericalTensor):
         """
@@ -200,7 +211,15 @@ class RepNorm1d(torch.nn.Module):
         x0 = x.invariant()
         assert x0.dim() == 2
         x1 = self.norm(x0)
-        divisor = torch.abs(x0.mul(1 - self.beta) + self.beta) + self._eps
+        divisor = (
+            torch.abs(
+                x0[:, self._n_invariant_channels :].mul(1 - self.beta) + self.beta
+            )
+            + self._eps
+        )
+        divisor = torch.cat(
+            [torch.ones_like(x0[:, : self._n_invariant_channels]), divisor], dim=1
+        )
         x2 = x.scalar_mul(1 / divisor)
         # x2.ten = x2.ten.div((x.rep_layout[0][0] * 2 + 1).type(x0.dtype).sqrt().unsqueeze(0))
         return x1, x2
