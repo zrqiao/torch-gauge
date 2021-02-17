@@ -102,6 +102,9 @@ class SphericalTensor:
     def __add__(self, other: "SphericalTensor"):
         return self.self_like(self.ten + other.ten)
 
+    def __sub__(self, other: "SphericalTensor"):
+        return self.self_like(self.ten - other.ten)
+
     def scalar_mul(self, other: torch.Tensor, inplace=False):
         """
         Performing representation-wise scalar multiplication.

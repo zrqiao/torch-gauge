@@ -109,6 +109,13 @@ class IELin(torch.nn.Module):
             requires_grad=False,
         )
         self.num_out_channels = torch.sum(self._metadata_out).item()
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        for linear in self.linears:
+            if linear is None:
+                continue
+            torch.nn.init.kaiming_uniform_(linear.weight, a=math.sqrt(5), mode="fan_in")
 
     def forward(self, x: SphericalTensor) -> SphericalTensor:
         """
