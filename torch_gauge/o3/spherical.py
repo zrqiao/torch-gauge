@@ -529,7 +529,7 @@ class O3Tensor(SphericalTensor):
                 [metadata, torch.zeros_like(metadata)], dim=2
             ).view(metadata.shape[0], -1)
             o3_layout = tuple(
-                torch.cat([layout, torch.ones(1, layout.shape[1])], dim=0)
+                torch.cat([layout, torch.ones(1, layout.shape[1], dtype=layout.dtype)], dim=0)
                 for layout in so3_ten.rep_layout
             )
         elif parity == -1:
@@ -537,7 +537,7 @@ class O3Tensor(SphericalTensor):
                 [torch.zeros_like(metadata), metadata], dim=2
             ).view(metadata.shape[0], -1)
             o3_layout = tuple(
-                torch.cat([layout, torch.ones(1, layout.shape[1]).neg()], dim=0)
+                torch.cat([layout, torch.ones(1, layout.shape[1], dtype=layout.dtype).neg()], dim=0)
                 for layout in so3_ten.rep_layout
             )
         else:
