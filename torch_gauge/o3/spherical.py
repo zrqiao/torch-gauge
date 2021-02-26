@@ -380,10 +380,10 @@ class SphericalTensor:
 
     def generate_rep_layout(self) -> Tuple[torch.LongTensor, ...]:
         if len(self.rep_dims) == 1:
-            return (self.generate_rep_layout_1d_(self.metadata[0]),)
+            return (self.generate_rep_layout_1d_(self.metadata[0]).to(self.ten.device),)
         elif len(self.rep_dims) == 2:
-            rep_layout_0 = self.generate_rep_layout_1d_(self.metadata[0])
-            rep_layout_1 = self.generate_rep_layout_1d_(self.metadata[1])
+            rep_layout_0 = self.generate_rep_layout_1d_(self.metadata[0]).to(self.ten.device)
+            rep_layout_1 = self.generate_rep_layout_1d_(self.metadata[1]).to(self.ten.device)
             return rep_layout_0, rep_layout_1
         else:
             raise NotImplementedError
