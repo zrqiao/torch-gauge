@@ -382,8 +382,12 @@ class SphericalTensor:
         if len(self.rep_dims) == 1:
             return (self.generate_rep_layout_1d_(self.metadata[0]).to(self.ten.device),)
         elif len(self.rep_dims) == 2:
-            rep_layout_0 = self.generate_rep_layout_1d_(self.metadata[0]).to(self.ten.device)
-            rep_layout_1 = self.generate_rep_layout_1d_(self.metadata[1]).to(self.ten.device)
+            rep_layout_0 = self.generate_rep_layout_1d_(self.metadata[0]).to(
+                self.ten.device
+            )
+            rep_layout_1 = self.generate_rep_layout_1d_(self.metadata[1]).to(
+                self.ten.device
+            )
             return rep_layout_0, rep_layout_1
         else:
             raise NotImplementedError
@@ -529,7 +533,10 @@ class O3Tensor(SphericalTensor):
                 [metadata, torch.zeros_like(metadata)], dim=2
             ).view(metadata.shape[0], -1)
             o3_layout = tuple(
-                torch.cat([layout, torch.ones(1, layout.shape[1], device=layout.device)], dim=0)
+                torch.cat(
+                    [layout, torch.ones(1, layout.shape[1], device=layout.device)],
+                    dim=0,
+                )
                 for layout in so3_ten.rep_layout
             )
         elif parity == -1:
@@ -537,7 +544,13 @@ class O3Tensor(SphericalTensor):
                 [torch.zeros_like(metadata), metadata], dim=2
             ).view(metadata.shape[0], -1)
             o3_layout = tuple(
-                torch.cat([layout, torch.ones(1, layout.shape[1], device=layout.device).neg()], dim=0)
+                torch.cat(
+                    [
+                        layout,
+                        torch.ones(1, layout.shape[1], device=layout.device).neg(),
+                    ],
+                    dim=0,
+                )
                 for layout in so3_ten.rep_layout
             )
         else:

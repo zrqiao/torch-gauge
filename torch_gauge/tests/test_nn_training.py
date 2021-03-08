@@ -103,7 +103,9 @@ class mini2d_o3(torch.nn.Module):
             Swish(),
             torch.nn.Linear(n_channels, n_channels),
         )
-        self.onebody_norm = RepNorm1d(num_channels=n_channels, n_invariant_channels=metadata[0])
+        self.onebody_norm = RepNorm1d(
+            num_channels=n_channels, n_invariant_channels=metadata[0]
+        )
         self.onebody_coupling = CGPCoupler(metadata, metadata, dtype=torch.float)
         self.onebody_ielin2 = IELin(
             self.onebody_coupling.metadata_out, metadata, group="o3"
