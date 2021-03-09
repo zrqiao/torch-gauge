@@ -534,7 +534,12 @@ class O3Tensor(SphericalTensor):
             ).view(metadata.shape[0], -1)
             o3_layout = tuple(
                 torch.cat(
-                    [layout, torch.ones(1, layout.shape[1], dtype=torch.long, device=layout.device)],
+                    [
+                        layout,
+                        torch.ones(
+                            1, layout.shape[1], dtype=torch.long, device=layout.device
+                        ),
+                    ],
                     dim=0,
                 )
                 for layout in so3_ten.rep_layout
@@ -547,7 +552,9 @@ class O3Tensor(SphericalTensor):
                 torch.cat(
                     [
                         layout,
-                        torch.ones(1, layout.shape[1], dtype=torch.long, device=layout.device).neg(),
+                        torch.ones(
+                            1, layout.shape[1], dtype=torch.long, device=layout.device
+                        ).neg(),
                     ],
                     dim=0,
                 )

@@ -108,6 +108,11 @@ class RSHxyz(torch.nn.Module):
         self.ns_lms = torch.nn.Parameter(
             torch.stack(ns_lms, dim=0), requires_grad=False
         )
+        self.out_metadata = torch.ones((1, self.max_l + 1), dtype=torch.long)
+        self.out_replayout = torch.nn.Parameter(
+            SphericalTensor.generate_rep_layout_1d_(self.out_metadata[0]),
+            requires_grad=False,
+        )
 
     def forward(self, xyz) -> SphericalTensor:
         """"""
@@ -124,8 +129,11 @@ class RSHxyz(torch.nn.Module):
         )
         out = out.mul_(self.ns_lms)
         out = out.view(*in_shape[:-1], self.ns_lms.shape[0])
+        # noinspection PyTypeChecker
         return SphericalTensor(
             out,
             rep_dims=(out.dim() - 1,),
-            metadata=torch.ones((1, self.max_l + 1), dtype=torch.long),
-        ).to(xyz.device)
+            metadata=self.out_metadata,
+            rep_layout=(self.out_replayout.data,),
+            num_channels=(self.max_l + 1,),
+        )

@@ -91,15 +91,3 @@ class NormContraction2d(torch.autograd.Function):
         norm_grad = data_ten / gathered_norm_shifted
         grad_input = gathered_grad_output.view_as(norm_grad) * norm_grad
         return grad_input, None, None, None, None
-
-
-class IrrepBroadcast(torch.autograd.Function):
-    """
-    Specialized functional for broadcasting scalar features with
-    a SO(3) kernel of identical channel-sizes per angular quantum number l.
-    """
-
-    @staticmethod
-    def forward(ctx, kernel, feature, metadata):
-        """"""
-        raise NotImplementedError

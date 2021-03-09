@@ -152,7 +152,9 @@ class IELin(torch.nn.Module):
                         self.n_irreps_per_l[lp_idx]
                     )
                 )
-                matid_to_fanin.append(torch.ones(nblocks_lp, dtype=torch.long) * nin_lpm)
+                matid_to_fanin.append(
+                    torch.full((nblocks_lp,), nin_lpm, dtype=torch.long)
+                )
                 mat_offset += nblocks_lp
         self.matrix_select_idx = torch.nn.Parameter(
             torch.cat(matrix_select_idx), requires_grad=False
@@ -184,7 +186,8 @@ class IELin(torch.nn.Module):
                     )
                     .view(bmv_degeneracy_lpm, 1, padding_size_out)
                     .expand(bmv_degeneracy_lpm, in_j_degeneracy_lpm, padding_size_out)
-                    .contiguous().view(-1)
+                    .contiguous()
+                    .view(-1)
                 )
                 dst_mask_lpm = torch.zeros(
                     padding_size_out * bmv_degeneracy_lpm, dtype=torch.long
@@ -193,7 +196,8 @@ class IELin(torch.nn.Module):
                 dst_mask_lpm = (
                     dst_mask_lpm.view(bmv_degeneracy_lpm, 1, padding_size_out)
                     .expand(bmv_degeneracy_lpm, in_j_degeneracy_lpm, padding_size_out)
-                    .contiguous().view(-1)
+                    .contiguous()
+                    .view(-1)
                 )
                 out_reduce_idx.append(dst_idx_lpm)
                 out_reduce_mask.append(dst_mask_lpm)
@@ -221,7 +225,7 @@ class IELin(torch.nn.Module):
     def reset_parameters(self) -> None:
         with torch.no_grad():
             for lid, fan_in in enumerate(self.matid_to_fanin):
-                bound = torch.sqrt(1/fan_in)
+                bound = torch.sqrt(1 / fan_in)
                 self.linears.data[lid].uniform_(-bound, bound)
 
     def forward(self, x: SphericalTensor) -> SphericalTensor:
@@ -472,3 +476,42 @@ class RepNorm1d(torch.nn.Module):
         x2 = x.self_like(x2_ten)
         # x2.ten = x2.ten.div((x.rep_layout[0][0] * 2 + 1).type(x0.dtype).sqrt().unsqueeze(0))
         return x1, x2
+
+
+class KernelBroadcast(torch.nn.Module):
+    """
+    Specialized module for broadcasting scalar features with
+    a SO(3) kernel of singleton channel-sizes per angular quantum number l.
+    """
+
+    def __init__(self, target_metadata):
+        super().__init__()
+        self.in_num_channels = len(target_metadata)
+        self.target_num_channels = torch.sum(target_metadata).item()
+        filter_broadcast_idx = []
+        src_idx = 0
+        for l, n_lm in enumerate(target_metadata):
+            for m in range(2 * l + 1):
+                filter_broadcast_idx.append(
+                    torch.full((n_lm.item(),), src_idx, dtype=torch.long)
+                )
+                src_idx += 1
+
+        self.filter_broadcast_idx = torch.nn.Parameter(
+            torch.cat(filter_broadcast_idx), requires_grad=False
+        )
+        self.feat_broadcast_idx = torch.nn.Parameter(
+            SphericalTensor.generate_rep_layout_1d_(target_metadata)[2, :],
+            requires_grad=False,
+        )
+
+    def forward(self, rshs: SphericalTensor, feat: torch.Tensor) -> torch.Tensor:
+        assert self.in_num_channels == rshs.num_channels[0]
+        assert self.target_num_channels == feat.shape[-1]
+        broadcasted_rshs = torch.index_select(
+            rshs.ten, dim=rshs.ten.dim() - 1, index=self.filter_broadcast_idx
+        )
+        broadcasted_feat = torch.index_select(
+            feat, dim=feat.dim() - 1, index=self.feat_broadcast_idx
+        )
+        return broadcasted_feat * broadcasted_rshs

@@ -7,8 +7,9 @@ import random
 
 import torch
 
-from torch_gauge.nn import IELin, RepNorm1d
+from torch_gauge.nn import IELin, KernelBroadcast, RepNorm1d
 from torch_gauge.o3 import SphericalTensor
+from torch_gauge.o3.rsh import RSHxyz
 from torch_gauge.o3.wigner import wigner_D_rsh
 
 
@@ -250,3 +251,13 @@ def test_RepNorm1d_backward():
     assert torch.all(norm_linear.weight.grad.abs().bool())
     assert torch.all(norm_linear.bias.grad.abs().bool())
     assert torch.all(gauge_linear.linears.grad.abs().sum((1, 2)).bool())
+
+
+def test_kernel_broadcast():
+    rshmodule = RSHxyz(max_l=6)
+    xyz = torch.normal(0, 1, size=(64, 3))
+    rshs = rshmodule(xyz)
+    feat = torch.rand(64, 128)
+    kbd = KernelBroadcast(torch.LongTensor([64, 32, 16, 8, 4, 2, 2]))
+    out = kbd(rshs, feat)
+    assert torch.all(out != 0)
