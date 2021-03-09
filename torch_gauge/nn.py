@@ -178,7 +178,7 @@ class IELin(torch.nn.Module):
                     )
                     .view(bmv_degeneracy_lpm, 1, padding_size_out)
                     .expand(bmv_degeneracy_lpm, in_j_degeneracy_lpm, padding_size_out)
-                    .view(-1)
+                    .contiguous().view(-1)
                 )
                 dst_mask_lpm = torch.zeros(
                     padding_size_out * bmv_degeneracy_lpm, dtype=torch.long
@@ -187,7 +187,7 @@ class IELin(torch.nn.Module):
                 dst_mask_lpm = (
                     dst_mask_lpm.view(bmv_degeneracy_lpm, 1, padding_size_out)
                     .expand(bmv_degeneracy_lpm, in_j_degeneracy_lpm, padding_size_out)
-                    .view(-1)
+                    .contiguous().view(-1)
                 )
                 out_reduce_idx.append(dst_idx_lpm)
                 out_reduce_mask.append(dst_mask_lpm)
