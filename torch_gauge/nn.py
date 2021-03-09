@@ -99,13 +99,15 @@ class IELin(torch.nn.Module):
         vector_padding_mask = []
         src_offset = 0
         for lp_idx, nin_lpm in enumerate(metadata_in):
+            nin_lpm = nin_lpm.item()
+            nout_lpm = metadata_out[lp_idx].item()
             if metadata_in[lp_idx] == 0:
                 continue
-            bmv_degeneracy_lpm = -(metadata_out[lp_idx] // (-padding_size_out))
+            bmv_degeneracy_lpm = -(nout_lpm // (-padding_size_out))
             if bmv_degeneracy_lpm == 0:
-                src_offset += nin_lpm * n_irreps_per_l[lp_idx]
+                src_offset += nin_lpm * self.n_irreps_per_l[lp_idx]
                 continue
-            for m in range(n_irreps_per_l[lp_idx]):
+            for m in range(self.n_irreps_per_l[lp_idx]):
                 # J-padding
                 vector_padding_idx_lpm = torch.zeros(
                     -(nin_lpm // (-padding_size_in)) * padding_size_in, dtype=torch.long
@@ -135,14 +137,15 @@ class IELin(torch.nn.Module):
         matrix_select_idx = []
         mat_offset = 0
         for lp_idx, nin_lpm in enumerate(metadata_in):
-            nout_lpm = metadata_out[lp_idx]
+            nin_lpm = nin_lpm.item()
+            nout_lpm = metadata_out[lp_idx].item()
             nblocks_lp = (-(nin_lpm // (-padding_size_in))) * (
                 -(nout_lpm // (-padding_size_out))
             )
             if nblocks_lp > 0:
                 matrix_select_idx.append(
                     (torch.arange(nblocks_lp, dtype=torch.long) + mat_offset).repeat(
-                        n_irreps_per_l[lp_idx]
+                        self.n_irreps_per_l[lp_idx]
                     )
                 )
                 mat_offset += nblocks_lp
@@ -150,21 +153,22 @@ class IELin(torch.nn.Module):
             torch.cat(matrix_select_idx), requires_grad=False
         )
         self.n_mats = mat_offset
-        self.n_gathered_mats = self.matrix_select_idx.size(0)
+        self.n_gathered_mats = self.matrix_select_idx.shape[0]
 
         out_reduce_idx = []
         out_reduce_mask = []
         dst_offset = 0
         for lp_idx, nout_lpm in enumerate(metadata_out):
-            nin_lpm = metadata_in[lp_idx]
+            nin_lpm = metadata_in[lp_idx].item()
+            nout_lpm = nout_lpm.item()
             if nout_lpm == 0:
                 continue
             bmv_degeneracy_lpm = -(nout_lpm // (-padding_size_out))
             in_j_degeneracy_lpm = -(nin_lpm // (-padding_size_in))
             if in_j_degeneracy_lpm == 0:
-                dst_offset += nout_lpm * n_irreps_per_l[lp_idx]
+                dst_offset += nout_lpm * self.n_irreps_per_l[lp_idx]
                 continue
-            for m in range(n_irreps_per_l[lp_idx]):
+            for m in range(self.n_irreps_per_l[lp_idx]):
                 dst_idx_lpm = (
                     (
                         dst_offset
@@ -172,8 +176,8 @@ class IELin(torch.nn.Module):
                             padding_size_out * bmv_degeneracy_lpm, dtype=torch.long
                         )
                     )
-                    .view(bmv_degeneracy_lpm, padding_size_out)
-                    .repeat(1, in_j_degeneracy_lpm, 1)
+                    .view(bmv_degeneracy_lpm, 1, padding_size_out)
+                    .expand(bmv_degeneracy_lpm, in_j_degeneracy_lpm, padding_size_out)
                     .view(-1)
                 )
                 dst_mask_lpm = torch.zeros(
@@ -181,20 +185,22 @@ class IELin(torch.nn.Module):
                 )
                 dst_mask_lpm[:nout_lpm] = 1
                 dst_mask_lpm = (
-                    dst_mask_lpm.view(bmv_degeneracy_lpm, padding_size_out)
-                    .repeat(1, in_j_degeneracy_lpm, 1)
+                    dst_mask_lpm.view(bmv_degeneracy_lpm, 1, padding_size_out)
+                    .expand(bmv_degeneracy_lpm, in_j_degeneracy_lpm, padding_size_out)
                     .view(-1)
                 )
+                out_reduce_idx.append(dst_idx_lpm)
+                out_reduce_mask.append(dst_mask_lpm)
                 dst_offset += nout_lpm
-        self.out_reduce_idx = torch.nn.Parameter(
-            torch.cat(out_reduce_idx), requires_grad=False
-        )
         self.out_reduce_mask = torch.nn.Parameter(
             torch.cat(out_reduce_mask).bool(), requires_grad=False
         )
+        self.out_reduce_idx = torch.nn.Parameter(
+            torch.cat(out_reduce_idx)[self.out_reduce_mask], requires_grad=False
+        )
 
         self.linears = torch.nn.Parameter(
-            torch.rand(self.n_mats, padding_size_in, padding_size_out)
+            torch.rand(self.n_mats, padding_size_in, padding_size_out) * 0.1
         )
         self.padding_size_in = padding_size_in
         self.padding_size_out = padding_size_out
@@ -207,8 +213,8 @@ class IELin(torch.nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        # TODO
-        return None
+        # TODO: fix the fan_in calculations
+        torch.nn.init.kaiming_uniform_(self.linears, a=math.sqrt(5), mode="fan_in")
 
     def forward(self, x: SphericalTensor) -> SphericalTensor:
         """
@@ -247,6 +253,7 @@ class IELin(torch.nn.Module):
             dtype=in_ten.dtype,
             device=in_ten.device,
         ).index_add_(1, self.out_reduce_idx, padded_out_ten[:, self.out_reduce_mask])
+        out_ten = out_ten.view(*x.ten.shape[:-1], -1)
 
         out_metadata = x.metadata.clone()
         out_metadata[-1] = self._metadata_out
