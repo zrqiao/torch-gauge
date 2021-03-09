@@ -68,7 +68,7 @@ class IELin(torch.nn.Module):
         benchmark (bool): search the optimal padding size when creating the module.
     """
 
-    def __init__(self, metadata_in, metadata_out, group="o3", benchmark=True):
+    def __init__(self, metadata_in, metadata_out, group="o3", benchmark=False):
         super().__init__()
         assert metadata_in.dim() == 1
         assert len(metadata_in) == len(metadata_out)
@@ -85,10 +85,13 @@ class IELin(torch.nn.Module):
         else:
             raise NotImplementedError(f"The group {group} is not supported in IELin")
 
-        padding_size_in = metadata_in.max().item()
-        padding_size_out = metadata_out.max().item()
-
-        # TODO: estimate the optimal padding size
+        if not benchmark:
+            # Maximum padding
+            padding_size_in = metadata_in.max().item()
+            padding_size_out = metadata_out.max().item()
+        else:
+            # TODO: estimate the optimal padding size and testing
+            raise NotImplementedError
 
         # Padding rules:
         # I - non-degenerate matrices, degenerate vectors, cat reduce
@@ -135,6 +138,7 @@ class IELin(torch.nn.Module):
         )
 
         matrix_select_idx = []
+        matid_to_fanin = []
         mat_offset = 0
         for lp_idx, nin_lpm in enumerate(metadata_in):
             nin_lpm = nin_lpm.item()
@@ -148,10 +152,12 @@ class IELin(torch.nn.Module):
                         self.n_irreps_per_l[lp_idx]
                     )
                 )
+                matid_to_fanin.append(torch.ones(nblocks_lp, dtype=torch.long) * nin_lpm)
                 mat_offset += nblocks_lp
         self.matrix_select_idx = torch.nn.Parameter(
             torch.cat(matrix_select_idx), requires_grad=False
         )
+        self.matid_to_fanin = torch.cat(matid_to_fanin)
         self.n_mats = mat_offset
         self.n_gathered_mats = self.matrix_select_idx.shape[0]
 
@@ -200,7 +206,7 @@ class IELin(torch.nn.Module):
         )
 
         self.linears = torch.nn.Parameter(
-            torch.rand(self.n_mats, padding_size_in, padding_size_out) * 0.1
+            torch.zeros(self.n_mats, padding_size_in, padding_size_out)
         )
         self.padding_size_in = padding_size_in
         self.padding_size_out = padding_size_out
@@ -213,8 +219,10 @@ class IELin(torch.nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        # TODO: fix the fan_in calculations
-        torch.nn.init.kaiming_uniform_(self.linears, a=math.sqrt(5), mode="fan_in")
+        with torch.no_grad():
+            for lid, fan_in in enumerate(self.matid_to_fanin):
+                bound = torch.sqrt(1/fan_in)
+                self.linears.data[lid].uniform_(-bound, bound)
 
     def forward(self, x: SphericalTensor) -> SphericalTensor:
         """
