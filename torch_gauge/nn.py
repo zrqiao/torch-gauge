@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from deprecated import deprecated
 
 from torch_gauge.o3 import O3Tensor, SphericalTensor
+from torch_gauge.o3.functional import NormContraction1d
 
 
 class SSP(torch.nn.Softplus):
@@ -236,6 +237,7 @@ class IELin(torch.nn.Module):
         Returns:
             The data tensor of the output spherical tensor.
         """
+        assert len(x.rep_dims) == 1
         assert x.rep_dims[-1] == x.ten.dim() - 1
         assert torch.all(x.metadata[-1].eq(self._metadata_in)), (
             f"Expected the SphericalTensor x and self._metadata_in to have the "
@@ -267,14 +269,14 @@ class IELin(torch.nn.Module):
         ).index_add_(1, self.out_reduce_idx, padded_out_ten[:, self.out_reduce_mask])
         out_ten = out_ten.view(*x.ten.shape[:-1], -1)
 
-        out_metadata = x.metadata.clone()
-        out_metadata[-1] = self._metadata_out
-        out_rep_layout = x.rep_layout[:-1] + (self.out_layout.data,)
+        # out_metadata = x.metadata.clone()
+        # out_metadata[-1] = self._metadata_out
+        out_metadata = self._metadata_out.unsqueeze(0)
         return self.tensor_class(
             out_ten,
             rep_dims=x.rep_dims,
             metadata=out_metadata,
-            rep_layout=out_rep_layout,
+            rep_layout=x.rep_layout[:-1] + (self.out_layout.data,),
             num_channels=x.num_channels[:-1] + (self.num_out_channels,),
         )
 
@@ -434,8 +436,11 @@ class RepNorm1d(torch.nn.Module):
             raise NotImplementedError
         # TODO: initialization schemes
         self.beta = torch.nn.Parameter(
-            torch.rand(self._num_channels - self._n_invariant_channels)
+            0.1 + torch.rand(self._num_channels - self._n_invariant_channels) * 0.9
         )
+        # self.beta = torch.nn.Parameter(
+        #     torch.ones(self._num_channels - self._n_invariant_channels)
+        # )
 
     def forward(self, x: SphericalTensor) -> (torch.Tensor, SphericalTensor):
         """
@@ -448,31 +453,49 @@ class RepNorm1d(torch.nn.Module):
 
                 (SphericalTensor): The "pure gauge" spherical tensor.
         """
-        x0 = x.invariant()
-        assert x0.dim() == 2
-        assert self._n_invariant_channels <= x.metadata[0][0]
-        x1 = self.norm(x0)
-        divisor = (
-            torch.abs(
-                x0[:, self._n_invariant_channels :].mul(1 - self.beta).add(self.beta)
+        assert x.ten.dim() == 2
+        if self._n_invariant_channels == 0:
+            x0 = invariant_rep = NormContraction1d.apply(
+                x.ten, x.rep_layout[0][2], (x.ten.shape[0], x.num_channels[0]), 1, 1e-04
             )
-            + self._eps
-        )
-        divisor_broadcasted = torch.index_select(
-            divisor,
-            dim=1,
-            index=(
-                x.rep_layout[0][2, self._n_invariant_channels :]
-                - self._n_invariant_channels
-            ),
-        )
-        x2_ten = torch.cat(
-            [
-                torch.ones_like(x1[:, : self._n_invariant_channels]),
-                x.ten[:, self._n_invariant_channels :].div(divisor_broadcasted),
-            ],
-            dim=1,
-        )
+            x1 = self.norm(x0)
+            # divisor = x0.mul(1 - self.beta).add(self.beta).abs().add(self._eps)
+            divisor = x0.add(self.beta).abs().add(self._eps)
+            divisor_broadcasted = torch.index_select(
+                divisor,
+                dim=1,
+                index=x.rep_layout[0][2],
+            )
+            x2_ten = x.ten.div(divisor_broadcasted)
+        else:
+            x0 = x.invariant()
+            assert self._n_invariant_channels <= x.metadata[0][0]
+            x1 = self.norm(x0)
+            # divisor = (
+            #     torch.abs(
+            #         x0[:, self._n_invariant_channels :].mul(1 - self.beta).add(self.beta)
+            #     )
+            #     + self._eps
+            # )
+            divisor = (
+                torch.abs(x0[:, self._n_invariant_channels :].add(self.beta))
+                + self._eps
+            )
+            divisor_broadcasted = torch.index_select(
+                divisor,
+                dim=1,
+                index=(
+                    x.rep_layout[0][2, self._n_invariant_channels :]
+                    - self._n_invariant_channels
+                ),
+            )
+            x2_ten = torch.cat(
+                [
+                    torch.ones_like(x1[:, : self._n_invariant_channels]),
+                    x.ten[:, self._n_invariant_channels :].div(divisor_broadcasted),
+                ],
+                dim=1,
+            )
         x2 = x.self_like(x2_ten)
         # x2.ten = x2.ten.div((x.rep_layout[0][0] * 2 + 1).type(x0.dtype).sqrt().unsqueeze(0))
         return x1, x2
