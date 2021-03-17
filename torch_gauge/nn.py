@@ -409,9 +409,9 @@ class RepNorm1d(torch.nn.Module):
     .. math::
 
         \mathrm{RepNorm}(\mathbf{h})_{l,m} = \mathrm{Norm}(||\mathbf{h}_l||)
-        \cdot \\frac{\mathbf{h}_{l}}{ \mathbf{h}_{l}|| + {\\beta}| + \\epsilon}
+        \cdot \frac{\mathbf{h}_{l}}{ ||\mathbf{h}_{l}|| + \beta + \epsilon}
 
-    Heuristically, the trainable :math:`\mathbf{\\beta}` controls the fraction of norm
+    Heuristically, the trainable :math:`\mathbf{\beta}` controls the fraction of norm
     information to be retained.
 
     The specified invariant channels are not affected by the gauge factorization, i.e.
