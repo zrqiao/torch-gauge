@@ -16,7 +16,7 @@ class UnivecAngle(torch.autograd.Function):
 
         Also see:
             https://www.cs.utexas.edu/users/evouga/uploads/4/5/6/8/45689883/turning.pdf
-        which is algebraically simpler but involves more forward arithmetic operations.
+            which is algebraically simpler but involves more forward arithmetic operations.
 
         On the benchmark CPU, tensor.norm() is much slower than dot and 2x slower than
         cross product. We take the second approach here.

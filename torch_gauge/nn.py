@@ -408,13 +408,14 @@ class RepNorm1d(torch.nn.Module):
 
     .. math::
 
-        \mathrm{RepNorm}(\mathbf{h})_{l,m} = \mathrm{BatchNorm}(||\mathbf{h}_l||)
-        \cdot \\frac{\mathbf{h}_{l}}{ |(1-{\\beta})||\mathbf{h}_{l}|| + {\\beta}| + \\epsilon}
+        \mathrm{RepNorm}(\mathbf{h})_{l,m} = \mathrm{Norm}(||\mathbf{h}_l||)
+        \cdot \frac{\mathbf{h}_{l}}{ ||\mathbf{h}_{l}|| + \beta + \epsilon}
 
-    Heuristically, the trainable :math:`\mathbf{\\beta}` controls the fraction of norm
+    Heuristically, the trainable :math:`\mathbf{\beta}` controls the fraction of norm
     information to be retained.
 
-    The specified invariant channels are not affected by the gauge factorization.
+    The specified invariant channels are not affected by the gauge factorization, i.e.
+    with the pure gauge regarded as ones.
     """
 
     def __init__(
