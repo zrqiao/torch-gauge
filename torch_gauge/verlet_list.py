@@ -289,8 +289,12 @@ class VerletList:
               device (torch.device): The device to which the data of the VerletList will be transferred.
         """
         self.neighbor_idx = self.neighbor_idx.to(device)
-        self.ndata = {k: v.to(device) for k, v in self.ndata.items()}
-        self.edata = {k: v.to(device) for k, v in self.edata.items()}
+        self.ndata = {
+            k: v.to(device) if v is not None else None for k, v in self.ndata.items()
+        }
+        self.edata = {
+            k: v.to(device) if v is not None else None for k, v in self.edata.items()
+        }
         self.edge_mask = self.edge_mask.to(device)
         self._dst_edim_locators = self._dst_edim_locators.to(device)
         self.batch_num_nodes = self.batch_num_nodes.to(device)
@@ -340,6 +344,8 @@ class VerletList:
                 )
             elif isinstance(efeat, torch.Tensor):
                 batched_vl.edata[ek] = torch.cat([vl.edata[ek] for vl in vls], dim=0)
+            elif efeat is None:
+                batched_vl.edata[ek] = None
             else:
                 raise NotImplementedError
 
