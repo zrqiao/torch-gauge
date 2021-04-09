@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+import numpy
 import torch
 
 from torch_gauge.o3.functional import NormContraction1d, NormContraction2d
@@ -427,6 +428,53 @@ class SphericalTensor:
         self.ten = self.ten.to(device)
         self.rep_layout = tuple(layout.to(device) for layout in self.rep_layout)
         return self
+
+
+def to_numpy(src_ten):
+    # Translate to a databasing-friendly dictionary object
+    if isinstance(src_ten, torch.Tensor):
+        return {
+            "_type": "torch.Tensor",
+            "ten": src_ten.numpy(),
+        }
+    elif isinstance(src_ten, SphericalTensor):
+        return {
+            "_type": src_ten.__class__.__name__,
+            "ten": src_ten.ten.numpy(),
+            "rep_dims": numpy.asarray(src_ten.rep_dims),
+            "metadata": src_ten.metadata.numpy(),
+            "cated_rep_layout": torch.cat(src_ten.rep_layout, dim=1).numpy(),
+            "rep_offsets": numpy.cumsum(
+                numpy.asarray(list(rl.shape[0] for rl in src_ten.rep_layout))
+            ),
+            "num_channels": numpy.asarray(src_ten.num_channels),
+        }
+    elif src_ten is None:
+        return {
+            "_type": "NoneType",
+        }
+    else:
+        raise ValueError
+
+
+def from_numpy(src_dict):
+    if src_dict["_type"] == "torch.Tensor":
+        return torch.from_numpy(src_dict["ten"])
+    elif src_dict["_type"] == "NoneType":
+        return None
+    else:
+        target_class = getattr(torch_gauge.o3.spherical, src_dict["_type"])
+        rep_layout = numpy.split(
+            src_dict["cated_rep_layout"], src_dict["rep_offsets"], axis=1
+        )
+        rep_layout = tuple(torch.from_numpy(rl) for rl in rep_layout)
+        return target_class(
+            torch.from_numpy(src_dict["ten"]),
+            rep_dims=tuple(src_dict["rep_dims"]),
+            metadata=torch.from_numpy(src_dict["metadata"]),
+            rep_layout=rep_layout,
+            num_channels=tuple(src_dict["num_channels"]),
+        )
 
 
 @dataclass

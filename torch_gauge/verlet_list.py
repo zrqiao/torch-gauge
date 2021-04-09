@@ -3,6 +3,7 @@ from typing import Sequence
 
 import torch
 
+import torch_gauge.o3
 from torch_gauge.o3.spherical import SphericalTensor
 
 
@@ -300,6 +301,32 @@ class VerletList:
         self.batch_num_nodes = self.batch_num_nodes.to(device)
         return self
 
+    def to_numpy_dict(self):
+        return {
+            "PADSIZE": self.PADSIZE,
+            "n_nodes": self.n_nodes,
+            "neighbor_idx": self.neighbor_idx.numpy(),
+            "edge_mask": self.edge_mask.numpy(),
+            "_dst_edim_locators": self._dst_edim_locators.numpy(),
+            "batch_num_nodes": self.batch_num_nodes.numpy(),
+            "ndata": {nk: torch_gauge.o3.to_numpy(nv) for nk, nv in self.ndata.items()},
+            "edata": {ek: torch_gauge.o3.to_numpy(ev) for ek, ev in self.edata.items()},
+        }
+
+    def from_numpy_dict(self, src_dict):
+        self.PADSIZE = src_dict["PADSIZE"]
+        self.n_nodes = src_dict["n_nodes"]
+        self.neighbor_idx = torch.from_numpy(src_dict["neighbor_idx"])
+        self.edge_mask = torch.from_numpy(src_dict["edge_mask"])
+        self._dst_edim_locators = torch.from_numpy(src_dict["_dst_edim_locators"])
+        self.batch_num_nodes = torch.from_numpy(src_dict["batch_num_nodes"])
+        self.ndata = {
+            nk: torch_gauge.o3.from_numpy(nv) for nk, nv in src_dict["ndata"].items()
+        }
+        self.edata = {
+            ek: torch_gauge.o3.from_numpy(ev) for ek, ev in src_dict["edata"].items()
+        }
+
     @staticmethod
     def batch(vls: Sequence["VerletList"]):
         """
@@ -311,7 +338,6 @@ class VerletList:
         Warning:
             In the current version, taking batch of batched VerletLists is not supported.
         """
-        # TODO: support cat() for SphericalTensor
         batched_vl = VerletList()
         batched_vl.PADSIZE = vls[0].PADSIZE
         batched_vl.batch_num_nodes = torch.cat([vl.batch_num_nodes for vl in vls])

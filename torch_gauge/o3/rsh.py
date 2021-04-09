@@ -118,7 +118,16 @@ class RSHxyz(torch.nn.Module):
         """"""
         in_shape = xyz.shape
         xyz = xyz.view(-1, 3)
-        xyz_poly = torch.pow(xyz.unsqueeze(-1), self.xyzpows.unsqueeze(0)).prod(dim=1)
+        # Enforce 0**0=1 for second-order backward stability
+        mask = self.xyzpows == 0
+        xyz_poly = torch.ones(
+            *xyz.shape, self.xyzpows.shape[-1], dtype=xyz.dtype, device=xyz.device
+        )
+        xyz_poly[:, ~mask] = torch.pow(
+            xyz.unsqueeze(-1).expand_as(xyz_poly)[:, ~mask],
+            self.xyzpows.unsqueeze(0).expand_as(xyz_poly)[:, ~mask],
+        )
+        xyz_poly = xyz_poly.prod(dim=1)
         out = torch.zeros(
             xyz.shape[0], self.ns_lms.shape[0], device=xyz.device, dtype=xyz.dtype
         )
