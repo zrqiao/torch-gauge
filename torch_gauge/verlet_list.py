@@ -326,6 +326,7 @@ class VerletList:
         self.edata = {
             ek: torch_gauge.o3.from_numpy(ev) for ek, ev in src_dict["edata"].items()
         }
+        return self
 
     @staticmethod
     def batch(vls: Sequence["VerletList"]):

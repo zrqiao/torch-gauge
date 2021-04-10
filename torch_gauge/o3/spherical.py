@@ -4,6 +4,7 @@ from typing import Optional, Tuple
 import numpy
 import torch
 
+import torch_gauge.o3
 from torch_gauge.o3.functional import NormContraction1d, NormContraction2d
 
 
@@ -445,7 +446,7 @@ def to_numpy(src_ten):
             "metadata": src_ten.metadata.numpy(),
             "cated_rep_layout": torch.cat(src_ten.rep_layout, dim=1).numpy(),
             "rep_offsets": numpy.cumsum(
-                numpy.asarray(list(rl.shape[0] for rl in src_ten.rep_layout))
+                numpy.asarray(list(rl.shape[1] for rl in src_ten.rep_layout))
             ),
             "num_channels": numpy.asarray(src_ten.num_channels),
         }
