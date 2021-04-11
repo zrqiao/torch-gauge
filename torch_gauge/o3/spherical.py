@@ -466,7 +466,7 @@ def from_numpy(src_dict):
     else:
         target_class = getattr(torch_gauge.o3.spherical, src_dict["_type"])
         rep_layout = numpy.split(
-            src_dict["cated_rep_layout"], src_dict["rep_offsets"], axis=1
+            src_dict["cated_rep_layout"], src_dict["rep_offsets"][:-1], axis=1
         )
         rep_layout = tuple(torch.from_numpy(rl) for rl in rep_layout)
         return target_class(
