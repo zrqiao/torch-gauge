@@ -96,22 +96,14 @@ class RSHxyz(torch.nn.Module):
                 xyzpows.append(xyzpowlm)
                 ns_lms.append(ns_lm)
                 clmtuvs.append(clm_tuv)
-        self.dst_pointers = torch.nn.Parameter(
-            torch.cat(dst_pointers).long(), requires_grad=False
-        )
-        self.clm_tuvs = torch.nn.Parameter(
-            torch.cat(clmtuvs, dim=0), requires_grad=False
-        )
-        self.xyzpows = torch.nn.Parameter(
-            torch.cat(xyzpows, dim=1).long(), requires_grad=False
-        )
-        self.ns_lms = torch.nn.Parameter(
-            torch.stack(ns_lms, dim=0), requires_grad=False
-        )
+        self.register_buffer("dst_pointers", torch.cat(dst_pointers).long())
+        self.register_buffer("clm_tuvs", torch.cat(clmtuvs, dim=0))
+        self.register_buffer("xyzpows", torch.cat(xyzpows, dim=1).long())
+        self.register_buffer("ns_lms", torch.stack(ns_lms, dim=0))
         self.out_metadata = torch.ones((1, self.max_l + 1), dtype=torch.long)
-        self.out_replayout = torch.nn.Parameter(
+        self.register_buffer(
+            "out_replayout",
             SphericalTensor.generate_rep_layout_1d_(self.out_metadata[0]),
-            requires_grad=False,
         )
 
     def forward(self, xyz) -> SphericalTensor:

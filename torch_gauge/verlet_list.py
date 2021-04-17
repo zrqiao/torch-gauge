@@ -188,6 +188,10 @@ class VerletList:
 
     def _scatter_efeat(self, edata, verlet_mask, src_raw):
         if isinstance(edata, torch.Tensor):
+            if not verlet_mask.any():
+                return torch.zeros(
+                    self.n_nodes, self.PADSIZE, *edata.shape[2:], dtype=edata.dtype
+                )
             return (
                 torch.zeros(
                     self.n_nodes,
@@ -203,6 +207,15 @@ class VerletList:
                 .view(self.n_nodes, self.PADSIZE, *edata.shape[2:])
             )
         elif isinstance(edata, SphericalTensor):
+            if not verlet_mask.any():
+                return edata.self_like(
+                    torch.zeros(
+                        self.n_nodes,
+                        self.PADSIZE,
+                        *edata.shape[2:],
+                        dtype=edata.ten.dtype,
+                    )
+                )
             out_ten = (
                 torch.zeros(
                     self.n_nodes,

@@ -131,11 +131,9 @@ class IELin(torch.nn.Module):
                     vector_padding_mask_lpm.repeat(bmv_degeneracy_lpm)
                 )
                 src_offset += nin_lpm
-        self.vector_padding_idx = torch.nn.Parameter(
-            torch.cat(vector_padding_idx), requires_grad=False
-        )
-        self.vector_padding_mask = torch.nn.Parameter(
-            torch.cat(vector_padding_mask).bool(), requires_grad=False
+        self.register_buffer("vector_padding_idx", torch.cat(vector_padding_idx))
+        self.register_buffer(
+            "vector_padding_mask", torch.cat(vector_padding_mask).bool()
         )
 
         matrix_select_idx = []
@@ -157,9 +155,7 @@ class IELin(torch.nn.Module):
                     torch.full((nblocks_lp,), nin_lpm, dtype=torch.long)
                 )
                 mat_offset += nblocks_lp
-        self.matrix_select_idx = torch.nn.Parameter(
-            torch.cat(matrix_select_idx), requires_grad=False
-        )
+        self.register_buffer("matrix_select_idx", torch.cat(matrix_select_idx))
         self.matid_to_fanin = torch.cat(matid_to_fanin)
         self.n_mats = mat_offset
         self.n_gathered_mats = self.matrix_select_idx.shape[0]
@@ -203,11 +199,10 @@ class IELin(torch.nn.Module):
                 out_reduce_idx.append(dst_idx_lpm)
                 out_reduce_mask.append(dst_mask_lpm)
                 dst_offset += nout_lpm
-        self.out_reduce_mask = torch.nn.Parameter(
-            torch.cat(out_reduce_mask).bool(), requires_grad=False
-        )
-        self.out_reduce_idx = torch.nn.Parameter(
-            torch.cat(out_reduce_idx)[self.out_reduce_mask], requires_grad=False
+        self.register_buffer("out_reduce_mask", torch.cat(out_reduce_mask).bool())
+        self.register_buffer(
+            "out_reduce_idx",
+            torch.cat(out_reduce_idx)[self.out_reduce_mask],
         )
 
         self.linears = torch.nn.Parameter(
@@ -216,9 +211,9 @@ class IELin(torch.nn.Module):
         self.padding_size_in = padding_size_in
         self.padding_size_out = padding_size_out
 
-        self.out_layout = torch.nn.Parameter(
+        self.register_buffer(
+            "out_layout",
             self.tensor_class.generate_rep_layout_1d_(self._metadata_out),
-            requires_grad=False,
         )
         self.num_out_channels = torch.sum(self._metadata_out).item()
         self.reset_parameters()
@@ -337,9 +332,9 @@ class IELinSerial(torch.nn.Module):
         )
         self._end_inds_in = torch.cumsum(self._metadata_in * self.n_irreps_per_l, dim=0)
         self._start_inds_in = torch.cat([torch.LongTensor([0]), self._end_inds_in[:-1]])
-        self.out_layout = torch.nn.Parameter(
+        self.register_buffer(
+            "out_layout",
             self.tensor_class.generate_rep_layout_1d_(self._metadata_out),
-            requires_grad=False,
         )
         self.num_out_channels = torch.sum(self._metadata_out).item()
         self.reset_parameters()
@@ -437,7 +432,7 @@ class RepNorm1d(torch.nn.Module):
             raise NotImplementedError
         # TODO: initialization schemes
         self.beta = torch.nn.Parameter(
-            0.1 + torch.rand(self._num_channels - self._n_invariant_channels) * 0.9
+            0.5 + torch.rand(self._num_channels - self._n_invariant_channels) * 1.0
         )
         # self.beta = torch.nn.Parameter(
         #     torch.ones(self._num_channels - self._n_invariant_channels)
@@ -521,12 +516,10 @@ class KernelBroadcast(torch.nn.Module):
                 )
                 src_idx += 1
 
-        self.filter_broadcast_idx = torch.nn.Parameter(
-            torch.cat(filter_broadcast_idx), requires_grad=False
-        )
-        self.feat_broadcast_idx = torch.nn.Parameter(
+        self.register_buffer("filter_broadcast_idx", torch.cat(filter_broadcast_idx))
+        self.register_buffer(
+            "feat_broadcast_idx",
             SphericalTensor.generate_rep_layout_1d_(target_metadata)[2, :],
-            requires_grad=False,
         )
 
     def forward(self, rshs: SphericalTensor, feat: torch.Tensor) -> torch.Tensor:

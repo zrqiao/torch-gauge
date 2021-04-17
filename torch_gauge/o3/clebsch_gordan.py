@@ -199,9 +199,9 @@ class CGCoupler(torch.nn.Module):
         self.parity = parity
         self.dtype = dtype
         self._init_params(overlap_out, trunc_in)
-        self.out_layout = torch.nn.Parameter(
+        self.register_buffer(
+            "out_layout",
             SphericalTensor.generate_rep_layout_1d_(self.metadata_out),
-            requires_grad=False,
         )
 
     def _init_params(self, overlap_out, trunc_in):
@@ -290,17 +290,21 @@ class CGCoupler(torch.nn.Module):
                 out_ns_offset += degeneracy
             lout_last = lout
 
-        self.cg_tilde = torch.nn.Parameter(
-            torch.cat(cg_tilde).type(self.dtype), requires_grad=False
+        self.register_buffer(
+            "cg_tilde",
+            torch.cat(cg_tilde).type(self.dtype),
         )
-        self.repids_in1 = torch.nn.Parameter(
-            torch.cat(repids_in1).long(), requires_grad=False
+        self.register_buffer(
+            "repids_in1",
+            torch.cat(repids_in1).long(),
         )
-        self.repids_in2 = torch.nn.Parameter(
-            torch.cat(repids_in2).long(), requires_grad=False
+        self.register_buffer(
+            "repids_in2",
+            torch.cat(repids_in2).long(),
         )
-        self.repids_out = torch.nn.Parameter(
-            torch.cat(repids_out).long(), requires_grad=False
+        self.register_buffer(
+            "repids_out",
+            torch.cat(repids_out).long(),
         )
         # Do not transfer metadata to device
         self.metadata_out = metadata_out
@@ -394,8 +398,9 @@ class CGPCoupler(torch.nn.Module):
         self.metadata_in2 = metadata_2
         self.dtype = dtype
         self._init_params(trunc_in)
-        self.out_layout = torch.nn.Parameter(
-            O3Tensor.generate_rep_layout_1d_(self.metadata_out), requires_grad=False
+        self.register_buffer(
+            "out_layout",
+            O3Tensor.generate_rep_layout_1d_(self.metadata_out),
         )
 
     def _init_params(self, trunc_in):
@@ -492,17 +497,21 @@ class CGPCoupler(torch.nn.Module):
             out_ns_offset += degeneracy
             lpout_last = lpout
 
-        self.cg_tilde = torch.nn.Parameter(
-            torch.cat(cg_tilde).type(self.dtype), requires_grad=False
+        self.register_buffer(
+            "cg_tilde",
+            torch.cat(cg_tilde).type(self.dtype),
         )
-        self.repids_in1 = torch.nn.Parameter(
-            torch.cat(repids_in1).long(), requires_grad=False
+        self.register_buffer(
+            "repids_in1",
+            torch.cat(repids_in1).long(),
         )
-        self.repids_in2 = torch.nn.Parameter(
-            torch.cat(repids_in2).long(), requires_grad=False
+        self.register_buffer(
+            "repids_in2",
+            torch.cat(repids_in2).long(),
         )
-        self.repids_out = torch.nn.Parameter(
-            torch.cat(repids_out).long(), requires_grad=False
+        self.register_buffer(
+            "repids_out",
+            torch.cat(repids_out).long(),
         )
         # Do not transfer metadata to device
         self.metadata_out = metadata_out
