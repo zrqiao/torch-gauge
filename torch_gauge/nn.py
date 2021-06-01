@@ -414,12 +414,19 @@ class RepNorm1d(torch.nn.Module):
     """
 
     def __init__(
-        self, num_channels, norm="batch", momentum=0.1, eps=1e-2, n_invariant_channels=0
+        self,
+        num_channels,
+        norm="batch",
+        momentum=0.1,
+        eps=1e-2,
+        n_invariant_channels=0,
+        mode="raw",
     ):
         super().__init__()
         self._num_channels = num_channels
         self._n_invariant_channels = n_invariant_channels
         self._eps = eps
+        self._mode = mode
         if norm == "batch":
             self.norm = torch.nn.BatchNorm1d(
                 num_features=num_channels, momentum=momentum, affine=False
@@ -428,15 +435,20 @@ class RepNorm1d(torch.nn.Module):
             self.norm = torch.nn.LayerNorm(
                 normalized_shape=num_channels, elementwise_affine=False
             )
+        elif norm == "none":
+            self.norm = None
         else:
             raise NotImplementedError
-        # TODO: initialization schemes
-        self.beta = torch.nn.Parameter(
-            0.5 + torch.rand(self._num_channels - self._n_invariant_channels) * 1.0
-        )
-        # self.beta = torch.nn.Parameter(
-        #     torch.ones(self._num_channels - self._n_invariant_channels)
-        # )
+        if self._mode == "raw":
+            self.beta = torch.nn.Parameter(
+                0.5 + torch.rand(self._num_channels - self._n_invariant_channels) * 1.0
+            )
+        elif self._mode == "inv":
+            self.betainv = torch.nn.Parameter(
+                0.5 + torch.rand(self._num_channels - self._n_invariant_channels) * 1.5
+            )
+        else:
+            raise NotImplementedError
 
     def forward(self, x: SphericalTensor) -> (torch.Tensor, SphericalTensor):
         """
@@ -449,14 +461,24 @@ class RepNorm1d(torch.nn.Module):
 
                 (SphericalTensor): The "pure gauge" spherical tensor.
         """
+        if self.norm is None:
+            x0 = NormContraction1d.apply(
+                x.ten, x.rep_layout[0][2], (x.ten.shape[0], x.num_channels[0]), 1, 1e-04
+            )
+            return x0, x
         assert x.ten.dim() == 2
+        if self._mode == "raw":
+            beta = self.beta
+        elif self._mode == "inv":
+            beta = self.betainv.abs().add(self._eps).reciprocal()
+        else:
+            raise NotImplementedError
         if self._n_invariant_channels == 0:
-            x0 = invariant_rep = NormContraction1d.apply(
+            x0 = NormContraction1d.apply(
                 x.ten, x.rep_layout[0][2], (x.ten.shape[0], x.num_channels[0]), 1, 1e-04
             )
             x1 = self.norm(x0)
-            # divisor = x0.mul(1 - self.beta).add(self.beta).abs().add(self._eps)
-            divisor = x0.add(self.beta).abs().add(self._eps)
+            divisor = x0.add(beta).abs().add(self._eps)
             divisor_broadcasted = torch.index_select(
                 divisor,
                 dim=1,
@@ -467,15 +489,8 @@ class RepNorm1d(torch.nn.Module):
             x0 = x.invariant()
             assert self._n_invariant_channels <= x.metadata[0][0]
             x1 = self.norm(x0)
-            # divisor = (
-            #     torch.abs(
-            #         x0[:, self._n_invariant_channels :].mul(1 - self.beta).add(self.beta)
-            #     )
-            #     + self._eps
-            # )
             divisor = (
-                torch.abs(x0[:, self._n_invariant_channels :].add(self.beta))
-                + self._eps
+                torch.abs(x0[:, self._n_invariant_channels :].add(beta)) + self._eps
             )
             divisor_broadcasted = torch.index_select(
                 divisor,
