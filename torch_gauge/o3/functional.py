@@ -91,3 +91,79 @@ class NormContraction2d(torch.autograd.Function):
         norm_grad = data_ten / gathered_norm_shifted
         grad_input = gathered_grad_output.view_as(norm_grad) * norm_grad
         return grad_input, None, None, None, None
+
+
+class SumsqrContraction1d(torch.autograd.Function):
+    """
+    Calculate the channel-wise sum of squared elements of a 1d spherical tensor.
+
+    The representation dimension must be an integer;
+    the gradients at zero are enforced to be 0 by a non-negative eps.
+    """
+
+    @staticmethod
+    def forward(ctx, data_ten: torch.Tensor, idx_ten: torch.LongTensor, out_shape, dim):
+        """"""
+        sum_sqr = torch.zeros(
+            out_shape, device=data_ten.device, dtype=data_ten.dtype
+        ).index_add_(dim, idx_ten, data_ten.pow(2))
+        ctx.dim = dim
+        ctx.save_for_backward(data_ten, idx_ten)
+        return sum_sqr
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """"""
+        data_ten, dst_ten = ctx.saved_tensors
+        gathered_grad_output = torch.index_select(
+            grad_output, dim=ctx.dim, index=dst_ten
+        )
+        grad_input = gathered_grad_output * data_ten.mul(2)
+        return grad_input, None, None, None
+
+
+class SumsqrContraction2d(torch.autograd.Function):
+    """
+    Calculate the channel-wise sum of squared elements of a 2d spherical tensor.
+
+    The representation dimensions must be a 2-tuple (i, i+1).
+    """
+
+    @staticmethod
+    def forward(
+        ctx,
+        data_ten: torch.Tensor,
+        idx_tens: torch.LongTensor,
+        out_shape,
+        dims,
+    ):
+        """"""
+        shape_rep_out = tuple(out_shape[d] for d in dims)
+        cache_inds = (
+            idx_tens[0] * shape_rep_out[1] + idx_tens[1]
+        ).flatten()  # flattened dst indices
+        sum_sqr_cache = torch.zeros(
+            out_shape,
+            device=data_ten.device,
+            dtype=data_ten.dtype,
+        ).flatten(*dims)
+        sum_sqr_cache = sum_sqr_cache.index_add_(
+            dims[0], cache_inds, data_ten.flatten(*dims).pow(2)
+        )
+        sum_sqr = sum_sqr_cache.view(out_shape)  # must be contiguous at this point
+        ctx.dims = dims
+        ctx.save_for_backward(data_ten, cache_inds)
+        return sum_sqr
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """"""
+        data_ten, cache_inds = ctx.saved_tensors
+        dims = ctx.dims
+        gathered_grad_output = torch.index_select(
+            grad_output.flatten(*dims),
+            dim=dims[0],
+            index=cache_inds,
+        )
+        grad_input = gathered_grad_output.view_as(data_ten) * data_ten.mul(2)
+        return grad_input, None, None, None

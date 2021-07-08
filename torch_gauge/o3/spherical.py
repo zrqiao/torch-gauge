@@ -5,7 +5,12 @@ import numpy
 import torch
 
 import torch_gauge.o3
-from torch_gauge.o3.functional import NormContraction1d, NormContraction2d
+from torch_gauge.o3.functional import (
+    NormContraction1d,
+    NormContraction2d,
+    SumsqrContraction1d,
+    SumsqrContraction2d,
+)
 
 
 @dataclass
@@ -329,7 +334,7 @@ class SphericalTensor:
                 num_channels=num_channels_t,
             )
 
-    def invariant(self) -> torch.Tensor:
+    def invariant(self, mode="l2") -> torch.Tensor:
         """
         Returns the invariant content of a SphericalTensor
 
@@ -350,9 +355,20 @@ class SphericalTensor:
             )
             # Subtract the L=0 offset in the pointer tensor
             idx_ten = self.rep_layout[0][2, l0_length:].sub(l0_length)
-            invariant_rep = NormContraction1d.apply(
-                data_rep, idx_ten, norm_shape, ops_dim, self._norm_eps
-            )
+            if mode == "l2":
+                invariant_rep = NormContraction1d.apply(
+                    data_rep, idx_ten, norm_shape, ops_dim, self._norm_eps
+                )
+            elif mode == "uest":
+                invariant_rep = NormContraction1d.apply(
+                    data_rep, idx_ten, norm_shape, ops_dim, 1.0
+                )
+            elif mode == "sumsqr":
+                invariant_rep = SumsqrContraction1d.apply(
+                    data_rep, idx_ten, norm_shape, ops_dim
+                )
+            else:
+                raise NotImplementedError
             return torch.cat([data_l0, invariant_rep], dim=ops_dim)
         elif len(self.rep_dims) == 2:
             idx_ten_0 = (
@@ -373,9 +389,20 @@ class SphericalTensor:
             norm_shape = list(self.shape)
             norm_shape[self.rep_dims[0]] = self.num_channels[0]
             norm_shape[self.rep_dims[1]] = self.num_channels[1]
-            invariant2d = NormContraction2d.apply(
-                self.ten, idx_tens, norm_shape, self.rep_dims, self._norm_eps
-            )
+            if mode == "l2":
+                invariant2d = NormContraction2d.apply(
+                    self.ten, idx_tens, norm_shape, self.rep_dims, self._norm_eps
+                )
+            if mode == "uest":
+                invariant2d = NormContraction2d.apply(
+                    self.ten, idx_tens, norm_shape, self.rep_dims, 1.0
+                )
+            elif mode == "sumsqr":
+                invariant2d = SumsqrContraction2d.apply(
+                    self.ten, idx_tens, norm_shape, self.rep_dims
+                )
+            else:
+                raise NotImplementedError
             return invariant2d
         else:
             raise NotImplementedError
