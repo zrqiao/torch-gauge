@@ -276,6 +276,157 @@ class IELin(torch.nn.Module):
         )
 
 
+class BlockSparseIELin(torch.nn.Module):
+    r"""
+    Sparisfied irrep-wise Equivariant Linear Layer. Recommended for building large scale models.
+
+    Linear transformation within each irrep are approximated via a random permutation on the m indices
+    and learnable block-diagonal linear layers
+
+    The permutation and matrix multiplication are performed on the last dimension of the spherical tensors.
+
+    Attributes:
+        metadata_in (torch.LongTensor): the number of non-degenerate feature channels of the input tensor
+            for each l (and the associated m(s)).
+        metadata_out (torch.LongTensor): the number of non-degenerate feature channels of the output tensor
+            for each l (and the associated m(s)).
+        group (str): The group index of the tensors to be passed.
+        block_size (int): size of diagonal blocks in linear layers, must be a common denominator of metadata_out
+    """
+
+    def __init__(self, metadata_in, metadata_out, group="o3", block_size=1):
+        super().__init__()
+        assert metadata_in.dim() == 1
+        assert len(metadata_in) == len(metadata_out)
+        self._metadata_in = metadata_in
+        self._metadata_out = metadata_out
+        group = group.lower()
+        if group == "so3":
+            self.tensor_class = SphericalTensor
+            self.n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0)) * 2 + 1
+        elif group == "o3":
+            self.tensor_class = O3Tensor
+            n_irreps_per_l = torch.arange(start=0, end=metadata_in.size(0) // 2) * 2 + 1
+            self.n_irreps_per_l = n_irreps_per_l.repeat_interleave(2)
+        else:
+            raise NotImplementedError(f"The group {group} is not supported in IELin")
+
+        self.block_size = block_size
+        metadata_inter = metadata_out.clone()
+        metadata_inter[~(self._metadata_in == 0)] = 0
+        self.register_buffer(
+            "interim_layout",
+            self.tensor_class.generate_rep_layout_1d_(self.metadata_inter),
+        )
+        self.interim_size = self.interim_layout.shape[1]
+        assert torch.remainder(self._metadata_inter, self.block_size).sum() == 0
+        self._isometric = False
+        if torch.all(self._metadata_in == self._metadata_out):
+            self._isometric = True
+        if not self._isometric:
+            self.scaling_factors = torch.nn.Parameter(
+                torch.rand(self._metadata_inter.sum().item()) + 0.5
+            )
+
+        # random permutation or scatter_add + small linear kernel
+        irrep_scatter_idx = []
+        vecin_select_idx = []
+        vecout_select_mask = []
+        src_offset = 0
+        interim_offset = 0
+        for lp_idx, nin_lpm in enumerate(metadata_in):
+            nin_lpm = nin_lpm.item()
+            nout_lpm = metadata_out[lp_idx].item()
+            if nout_lpm == 0:
+                # Pointer shift on input tensor
+                src_offset += nin_lpm * self.n_irreps_per_l[lp_idx]
+                continue
+            if nin_lpm == 0:
+                # Pointer shift on output tensor
+                interim_offset += nout_lpm * self.n_irreps_per_l[lp_idx]
+                vecout_select_mask.append(torch.zeros(nout_lpm * self.n_irreps_per_l[lp_idx], dtype=torch.bool))
+                continue
+            zoom_factor = -(nin_lpm // (-nout_lpm))
+            segment_scatter_idx = torch.arange(nout_lpm, dtype=torch.long).repeat(zoom_factor)
+            segment_scatter_idx = segment_scatter_idx[torch.randperm(nout_lpm*zoom_factor)][:nin_lpm]
+            vecout_select_mask.append(torch.ones(nout_lpm * self.n_irreps_per_l[lp_idx], dtype=torch.bool))
+            for m in range(self.n_irreps_per_l[lp_idx]):
+                vecin_select_idx_lpm = (
+                    torch.arange(nin_lpm, dtype=torch.long) + src_offset
+                )
+                vecin_select_idx.append(vecin_select_idx_lpm)
+                irrep_scatter_idx.append(segment_scatter_idx + interim_offset)
+                src_offset += nin_lpm
+                interim_offset += nout_lpm
+        assert self.interim_size == interim_offset
+        self.register_buffer("vecin_select_idx", torch.cat(vecin_select_idx))
+        self.register_buffer("irrep_scatter_idx", torch.cat(irrep_scatter_idx))
+        self.register_buffer("vecout_select_mask", torch.cat(vecout_select_mask))
+
+        if self.block_size > 1:
+            self.linear = torch.nn.Linear(self.block_size, self.block_size, bias=False)
+
+        self.register_buffer(
+            "out_layout",
+            self.tensor_class.generate_rep_layout_1d_(self._metadata_out),
+        )
+        self.num_out_channels = torch.sum(self._metadata_out).item()
+        # self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        with torch.no_grad():
+            bound = math.sqrt(1 / self.block_size)
+            self.linear.weight.data.uniform_(-bound, bound)
+
+    def forward(self, x: SphericalTensor) -> SphericalTensor:
+        """
+        Args:
+            x: The input SphericalTensor.
+
+        Returns:
+            The data tensor of the output spherical tensor.
+        """
+        assert len(x.rep_dims) == 1
+        assert x.rep_dims[-1] == x.ten.dim() - 1
+        assert torch.all(x.metadata[-1].eq(self._metadata_in)), (
+            f"Expected the SphericalTensor x and self._metadata_in to have the "
+            f"same irrep metadata along the last dimension, got {x.metadata[-1]}"
+            f" and {self._metadata_in} instead"
+        )
+        in_ten = x.ten.view(-1, x.ten.shape[-1])
+        if self._isometric:
+            interim_ten = torch.index_select(in_ten, 1, self.irrep_scatter_idx)
+            if self.block_size > 1:
+                interim_ten = (
+                    self.linear(interim_ten.view(in_ten.shape[0], -1, self.block_size))
+                ).view(in_ten.shape[0], -1)
+            out_ten = interim_ten.view(*x.ten.shape[:-1], -1)
+        else:
+            selected_in_ten = torch.index_select(in_ten, dim=1, index=self.vecin_select_idx)
+            interim_ten = torch.zeros(
+                in_ten.shape[0],
+                self.interim_size,
+                dtype=in_ten.dtype,
+                device=in_ten.device,
+            ).index_add_(1, self.irrep_scatter_idx, selected_in_ten).mul(
+                self.scaling_factors[self.interim_layout[0]].unsqueeze(0)
+            )
+            if self.block_size > 1:
+                interim_ten = (
+                    self.linear(interim_ten.view(in_ten.shape[0], -1, self.block_size))
+                ).view(in_ten.shape[0], -1)
+            out_ten = interim_ten[:, self.vecout_select_mask].view(*x.ten.shape[:-1], -1)
+
+        out_metadata = self._metadata_out.unsqueeze(0)
+        return self.tensor_class(
+            out_ten,
+            rep_dims=x.rep_dims,
+            metadata=out_metadata,
+            rep_layout=x.rep_layout[:-1] + (self.out_layout.data,),
+            num_channels=x.num_channels[:-1] + (self.num_out_channels,),
+        )
+
+
 class IELinSerial(torch.nn.Module):
     r"""
     Irrep-wise Equivariant Linear Layer.
