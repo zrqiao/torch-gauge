@@ -312,14 +312,17 @@ class BlockSparseIELin(torch.nn.Module):
             raise NotImplementedError(f"The group {group} is not supported in IELin")
 
         self.block_size = block_size
-        metadata_inter = metadata_out.clone()
-        metadata_inter[~(self._metadata_in == 0)] = 0
+        self._metadata_inter = metadata_out.clone()
+        self._metadata_inter[(self._metadata_in == 0)] = 0
         self.register_buffer(
             "interim_layout",
-            self.tensor_class.generate_rep_layout_1d_(self.metadata_inter),
+            self.tensor_class.generate_rep_layout_1d_(self._metadata_inter),
         )
         self.interim_size = self.interim_layout.shape[1]
-        assert torch.remainder(self._metadata_inter, self.block_size).sum() == 0
+        assert torch.remainder(self._metadata_inter, self.block_size).sum() == 0, print(
+            "The block_size much be a gcd of irrep sizes, got remainders: ",
+            torch.remainder(self._metadata_inter, self.block_size),
+        )
         self._isometric = False
         if torch.all(self._metadata_in == self._metadata_out):
             self._isometric = True
@@ -343,13 +346,22 @@ class BlockSparseIELin(torch.nn.Module):
                 continue
             if nin_lpm == 0:
                 # Pointer shift on output tensor
-                interim_offset += nout_lpm * self.n_irreps_per_l[lp_idx]
-                vecout_select_mask.append(torch.zeros(nout_lpm * self.n_irreps_per_l[lp_idx], dtype=torch.bool))
+                vecout_select_mask.append(
+                    torch.zeros(
+                        nout_lpm * self.n_irreps_per_l[lp_idx], dtype=torch.bool
+                    )
+                )
                 continue
             zoom_factor = -(nin_lpm // (-nout_lpm))
-            segment_scatter_idx = torch.arange(nout_lpm, dtype=torch.long).repeat(zoom_factor)
-            segment_scatter_idx = segment_scatter_idx[torch.randperm(nout_lpm*zoom_factor)][:nin_lpm]
-            vecout_select_mask.append(torch.ones(nout_lpm * self.n_irreps_per_l[lp_idx], dtype=torch.bool))
+            segment_scatter_idx = torch.arange(nout_lpm, dtype=torch.long).repeat(
+                zoom_factor
+            )
+            segment_scatter_idx = segment_scatter_idx[
+                torch.randperm(nout_lpm * zoom_factor)
+            ][:nin_lpm]
+            vecout_select_mask.append(
+                torch.ones(nout_lpm * self.n_irreps_per_l[lp_idx], dtype=torch.bool)
+            )
             for m in range(self.n_irreps_per_l[lp_idx]):
                 vecin_select_idx_lpm = (
                     torch.arange(nin_lpm, dtype=torch.long) + src_offset
@@ -358,7 +370,6 @@ class BlockSparseIELin(torch.nn.Module):
                 irrep_scatter_idx.append(segment_scatter_idx + interim_offset)
                 src_offset += nin_lpm
                 interim_offset += nout_lpm
-        assert self.interim_size == interim_offset
         self.register_buffer("vecin_select_idx", torch.cat(vecin_select_idx))
         self.register_buffer("irrep_scatter_idx", torch.cat(irrep_scatter_idx))
         self.register_buffer("vecout_select_mask", torch.cat(vecout_select_mask))
@@ -370,6 +381,8 @@ class BlockSparseIELin(torch.nn.Module):
             "out_layout",
             self.tensor_class.generate_rep_layout_1d_(self._metadata_out),
         )
+        assert self.interim_size == interim_offset
+        assert self.out_layout.shape[1] == self.vecout_select_mask.shape[0]
         self.num_out_channels = torch.sum(self._metadata_out).item()
         # self.reset_parameters()
 
@@ -402,20 +415,36 @@ class BlockSparseIELin(torch.nn.Module):
                 ).view(in_ten.shape[0], -1)
             out_ten = interim_ten.view(*x.ten.shape[:-1], -1)
         else:
-            selected_in_ten = torch.index_select(in_ten, dim=1, index=self.vecin_select_idx)
-            interim_ten = torch.zeros(
-                in_ten.shape[0],
-                self.interim_size,
-                dtype=in_ten.dtype,
-                device=in_ten.device,
-            ).index_add_(1, self.irrep_scatter_idx, selected_in_ten).mul(
-                self.scaling_factors[self.interim_layout[0]].unsqueeze(0)
+            selected_in_ten = torch.index_select(
+                in_ten, dim=1, index=self.vecin_select_idx
+            )
+            interim_ten = (
+                torch.zeros(
+                    in_ten.shape[0],
+                    self.interim_size,
+                    dtype=in_ten.dtype,
+                    device=in_ten.device,
+                )
+                .index_add_(1, self.irrep_scatter_idx, selected_in_ten)
+                .mul(self.scaling_factors[self.interim_layout[0]].unsqueeze(0))
             )
             if self.block_size > 1:
                 interim_ten = (
                     self.linear(interim_ten.view(in_ten.shape[0], -1, self.block_size))
                 ).view(in_ten.shape[0], -1)
-            out_ten = interim_ten[:, self.vecout_select_mask].view(*x.ten.shape[:-1], -1)
+            out_ten = (
+                torch.zeros(
+                    in_ten.shape[0],
+                    self.out_layout.shape[1],
+                    dtype=in_ten.dtype,
+                    device=in_ten.device,
+                )
+                .masked_scatter(
+                    self.vecout_select_mask.unsqueeze(0),
+                    interim_ten,
+                )
+                .view(*x.ten.shape[:-1], -1)
+            )
 
         out_metadata = self._metadata_out.unsqueeze(0)
         return self.tensor_class(
