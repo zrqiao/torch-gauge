@@ -577,9 +577,119 @@ class IELinSerial(torch.nn.Module):
         )
 
 
+class EvNorm1d(torch.nn.Module):
+    r"""
+    Equivariant Normalization layer.
+
+    The specified invariant channels are not affected by squashing.
+    """
+
+    def __init__(
+        self,
+        num_channels,
+        n_invariant_channels=0,
+    ):
+        super().__init__()
+        self._num_channels = num_channels
+        self._n_invariant_channels = n_invariant_channels
+
+    def forward(self, x: SphericalTensor) -> (torch.Tensor, SphericalTensor):
+        """
+        Args:
+            x: The input SphericalTensor.
+
+        Returns:
+            (tuple): tuple containing:
+                (torch.Tensor): The normalized invariant content.
+
+                (torch.Tensor): The "pure gauge" tensor for equivariant channels.
+        """
+        if self._n_invariant_channels == 0:
+            divisor = (
+                SumsqrContraction1d.apply(
+                    x.ten,
+                    x.rep_layout[0][2],
+                    (x.ten.shape[0], x.num_channels[0]),
+                    1,
+                )
+                .add(1)
+                .sqrt()
+            )
+            x1 = divisor - 1
+            divisor_broadcasted = torch.index_select(
+                divisor,
+                dim=1,
+                index=x.rep_layout[0][2],
+            )
+            x2 = x.ten.div(divisor_broadcasted)
+        else:
+            assert self._n_invariant_channels <= x.metadata[0][0]
+            x10 = x.ten[:, : self._n_invariant_channels]
+            divisor = (
+                SumsqrContraction1d.apply(
+                    x.ten[:, self._n_invariant_channels :],
+                    x.rep_layout[0][2, self._n_invariant_channels :]
+                    - self._n_invariant_channels,
+                    (x.ten.shape[0], x.num_channels[0] - self._n_invariant_channels),
+                    1,
+                )
+                .add(1)
+                .sqrt()
+            )
+            x11 = divisor - 1
+            x1 = torch.cat([x10, x11], dim=1)
+            divisor_broadcasted = torch.index_select(
+                divisor,
+                dim=1,
+                index=(
+                    x.rep_layout[0][2, self._n_invariant_channels :]
+                    - self._n_invariant_channels
+                ),
+            )
+            x2 = x.ten[:, self._n_invariant_channels :].div(divisor_broadcasted)
+        return x1, x2
+
+
+class EvMLP(torch.nn.Module):
+    def __init__(
+        self,
+        metadata,
+        norm1,
+        norm2,
+        activation_func,
+    ):
+        super().__init__()
+        self.n_invariant_channels = metadata[0].item()
+        self.num_channels = torch.sum(metadata).item()
+        self.evnorm = EvNorm1d(self.num_channels, self.n_invariant_channels)
+        if norm2 is not None:
+            self.mlp = torch.nn.Sequential(
+                torch.nn.Linear(
+                    self.num_channels, self.n_invariant_channels, bias=False
+                ),
+                norm1,
+                torch.nn.Linear(self.n_invariant_channels, self.n_invariant_channels),
+                activation_func,
+                norm2,
+                torch.nn.Linear(self.n_invariant_channels, self.n_invariant_channels),
+            )
+        else:
+            self.mlp = torch.nn.Sequential(
+                torch.nn.Linear(
+                    self.num_channels, self.n_invariant_channels, bias=False
+                ),
+                norm1,
+            )
+
+    def forward(self, x: SphericalTensor) -> SphericalTensor:
+        x1, x2 = self.evnorm(x)
+        x1_updated = self.mlp(x1)
+        return x.self_like(torch.cat([x1_updated, x2], dim=-1))
+
+
 class RepNorm1d(torch.nn.Module):
     r"""
-    The (experimental) Representation Normalization layer.
+    The Representation Normalization layer.
 
     .. math::
 
@@ -626,9 +736,6 @@ class RepNorm1d(torch.nn.Module):
                 0.5 + torch.rand(self._num_channels - self._n_invariant_channels) * 1.0
             )
         elif self._mode == "inv":
-            # self.betainv = torch.nn.Parameter(
-            #     0.5 + torch.rand(self._num_channels - self._n_invariant_channels) * 1.5
-            # )
             self.betainv = torch.nn.Parameter(
                 torch.rand(self._num_channels - self._n_invariant_channels) * 10.0
             )

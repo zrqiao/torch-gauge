@@ -43,7 +43,9 @@ class VerletList:
         self.batch_num_nodes = torch.LongTensor([self.n_nodes])
 
         in_degrees = verlet_mask.long().sum(1)
-        assert in_degrees.max().item() <= self.PADSIZE, f"The max node degree must be smaller than the padding size, got {in_degrees.max().item()} and {self.PADSIZE} instead"
+        assert (
+            in_degrees.max().item() <= self.PADSIZE
+        ), f"The max node degree must be smaller than the padding size, got {in_degrees.max().item()} and {self.PADSIZE} instead"
         src_raw = (
             torch.arange(num_nodes, dtype=torch.long)
             .unsqueeze(0)
