@@ -694,18 +694,20 @@ class EvMLP1d(torch.nn.Module):
         metadata,
         norm,
         activation_func,
+        dropout=0.0,
     ):
         super().__init__()
         self.n_invariant_channels = metadata[0].item()
         self.num_channels = torch.sum(metadata).item()
         self.evnorm = EvNorm1d(self.num_channels, self.n_invariant_channels)
+        self.dropout = dropout
         if norm is not None:
             self.mlp = torch.nn.Sequential(
                 norm,
                 torch.nn.Linear(self.num_channels, self.num_channels),
                 activation_func,
                 torch.nn.Linear(self.num_channels, self.num_channels),
-                activation_func,
+                torch.nn.Dropout(p=self.dropout),
             )
         else:
             # linear+squashing only
