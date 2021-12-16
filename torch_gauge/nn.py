@@ -480,7 +480,7 @@ class IELinSerial(torch.nn.Module):
         group (str): The group index of the tensors to be passed.
     """
 
-    @deprecated(version="1.4.0", reason="Please use the vectorized LELin module")
+    @deprecated(version="0.1.4", reason="Please use the vectorized IELin module")
     def __init__(self, metadata_in, metadata_out, group="o3"):
         super().__init__()
         assert metadata_in.dim() == 1
@@ -651,6 +651,7 @@ class EvNorm1d(torch.nn.Module):
 
 
 class EvMLP(torch.nn.Module):
+    @deprecated(version="0.2.2", reason="Please use the EvMLP1d class")
     def __init__(
         self,
         metadata,
@@ -685,6 +686,45 @@ class EvMLP(torch.nn.Module):
         x1, x2 = self.evnorm(x)
         x1_updated = self.mlp(x1)
         return x.self_like(torch.cat([x1_updated, x2], dim=-1))
+
+
+class EvMLP1d(torch.nn.Module):
+    def __init__(
+        self,
+        metadata,
+        norm,
+        activation_func,
+    ):
+        super().__init__()
+        self.n_invariant_channels = metadata[0].item()
+        self.num_channels = torch.sum(metadata).item()
+        self.evnorm = EvNorm1d(self.num_channels, self.n_invariant_channels)
+        if norm is not None:
+            self.mlp = torch.nn.Sequential(
+                norm,
+                torch.nn.Linear(self.num_channels, self.num_channels),
+                activation_func,
+                torch.nn.Linear(self.num_channels, self.num_channels),
+                activation_func,
+            )
+        else:
+            # linear+squashing only
+            self.mlp = torch.nn.Linear(self.num_channels, self.num_channels)
+
+    def forward(self, x: SphericalTensor) -> SphericalTensor:
+        x1, x2 = self.evnorm(x)
+        xi = self.mlp(x1)
+        gate = torch.index_select(
+            xi[:, self.n_invariant_channels :],
+            dim=1,
+            index=(
+                x.rep_layout[0][2, self.n_invariant_channels :]
+                - self.n_invariant_channels
+            ),
+        )
+        return x.self_like(
+            torch.cat([xi[:, : self.n_invariant_channels], x2.mul(gate)], dim=-1)
+        )
 
 
 class RepNorm1d(torch.nn.Module):
