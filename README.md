@@ -1,6 +1,6 @@
 # Torch-Gauge
 
-A light-weight [PyTorch](https://pytorch.org/) extension for efficient gauge-equivariant learning.
+A light-weight [PyTorch](https://pytorch.org/) extension for efficient equivariant deep learning.
 
 ## About
 **Torch-Gauge** is a library to boost geometric learning on physical data structures
@@ -12,8 +12,7 @@ Torch-Gauge uses padded [Verlet list](https://en.wikipedia.org/wiki/Verlet_list)
 manipulating relational data, which enables compact and highly customizable implementation of 
 geometric learning models.
 
-As an illustration, check out our implementation of [SchNet](https://arxiv.org/abs/1706.08566) 's
- interaction module in just 20 lines of code:
+As an illustration, [SchNet](https://arxiv.org/abs/1706.08566) 's interaction module can be concisely implemented:
 ```python
 import torch
 from torch.nn import Linear, Parameter
@@ -43,8 +42,7 @@ class SchNetLayer(torch.nn.Module):
     vl.ndata[f"atomic_{l+1}"] = vl.ndata[f"atomic_{l}"] + self.post_conv(conv_out)
     return vl.ndata[f"atomic_{l+1}"]
 ```
-And that's it. With the `SphericalTensor` support we can even quickly extend it to SE(3) equivariant 
-convolutions without pain, similar to the building block of [NequIP](https://arxiv.org/abs/2101.03164):
+With the `SphericalTensor` support we can feasibly extend it to SE(3)-equivariant convolutions:
 ```python
 import torch
 from torch_gauge.nn import SSP, IELin
@@ -89,10 +87,7 @@ class SE3Layer(torch.nn.Module):
 ```
 
 Torch-Gauge's Verlet list also supports generating higher-order views (triplets, quartets, etc.) to
- streamline implementing models with specialized non-2body message passing algorithms. 
-
-Conventional molecular descriptors that were commonly used in Kernel methods can also be revisited 
-by Torch-Gauge, and examples will be provided in future versions.
+ streamline the implemention of models with specialized non-2body message passing algorithms. 
 
 ## Setups
 
@@ -108,13 +103,12 @@ Once PyTorch is installed, running
 
 ## Project Structure
 - `torch_gauge` High-level python functions
-    - `torch_gauge/o3` O(3) group algebra functionals
+    - `torch_gauge/o3` O(3) group algebra functionals and data structures
     - `torch_gauge/nn.py` Tensorial neural network building blocks
     - `torch_gauge/verlet_list.py` Verlet neighbor-list operations for representing relational data
     - `torch_gauge/geometric.py` contains geometric and algebra operations with autograd
     - `torch_gauge/models` contains exemplary implementations of GNN variants and descriptors 
     - `torch_gauge/tests` contains pytests
-- `src` contains C++/CUDA backend operations (under development)
     
 ## Test
 
