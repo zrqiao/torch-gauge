@@ -10,13 +10,14 @@ import os
 
 import torch
 from joblib import Memory
-from scipy.special import binom, factorial
 
 from torch_gauge import ROOT_DIR
 from torch_gauge.o3.spherical import SphericalTensor
 
 memory = Memory(os.path.join(ROOT_DIR, ".o3_cache"), verbose=0)
 
+def torch_factorial(x):
+  return torch.exp(torch.lgamma(x + 1))
 
 def vm(m):
     return (1 / 2) * (m < 0).long()
@@ -39,10 +40,10 @@ def get_c_lmtuv(l, m, t, u, v):
 
 @memory.cache
 def get_ns_lm(l, m):
-    return (1 / (2 ** torch.abs(m) * factorial(l))) * torch.sqrt(
+    return (1 / (2 ** torch.abs(m) * torch_factorial(l))) * torch.sqrt(
         2
-        * factorial(l + torch.abs(m))
-        * factorial(l - torch.abs(m))
+        * torch_factorial(l + torch.abs(m))
+        * torch_factorial(l - torch.abs(m))
         / (2 ** (m == 0).long())
     )
 
